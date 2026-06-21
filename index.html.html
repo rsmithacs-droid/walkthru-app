@@ -1,0 +1,1815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WalkThru — Classroom Observation System</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.34.0/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* ============================================================
+   WALKTHRU — Classroom Observation System
+   Version 6.0 (AI-powered — Anthropic API)
+   Office of Academic Affairs
+   Set your ANTHROPIC_API_KEY and Supabase credentials before deploying.
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --blue:#185FA5;--blue-dk:#0C447C;--blue-lt:#E6F1FB;
+  --green:#3B6D11;--green-lt:#EAF3DE;
+  --amber:#854F0B;--amber-lt:#FAEEDA;
+  --red:#A32D2D;--red-lt:#FCEBEB;
+  --text:#1a1a1a;--text2:#555;--text3:#888;
+  --bg:#fff;--bg2:#f7f7f7;--bg3:#f0f0f0;
+  --border:rgba(0,0,0,0.12);--border2:rgba(0,0,0,0.22);
+  --radius:8px;--radius-lg:12px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:var(--bg2);color:var(--text);font-size:14px;min-height:100vh;}
+.nav{display:flex;align-items:center;background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+.nav-brand{font-size:13px;font-weight:600;color:var(--blue);padding:12px 18px;border-right:1px solid var(--border);display:flex;align-items:center;gap:7px;white-space:nowrap;}
+.nav-brand i{font-size:18px;}
+.nav-tabs{display:flex;overflow-x:auto;}
+.nt{padding:12px 16px;font-size:13px;cursor:pointer;color:var(--text2);border-bottom:3px solid transparent;background:none;border-top:none;border-left:none;border-right:none;display:flex;align-items:center;gap:6px;white-space:nowrap;font-family:inherit;transition:color .15s;}
+.nt:hover{color:var(--text);background:var(--bg2);}
+.nt.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:600;}
+.nt i{font-size:16px;}
+.view{display:none;max-width:960px;margin:0 auto;padding:24px 20px;}
+.view.active{display:block;}
+.sec-label{font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--text3);text-transform:uppercase;margin-bottom:10px;}
+.card{background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:16px;}
+.card-title{font-size:12px;font-weight:600;color:var(--text2);margin-bottom:14px;display:flex;align-items:center;gap:6px;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px;}
+.fg{display:flex;flex-direction:column;gap:4px;}
+label{font-size:11px;font-weight:600;color:var(--text2);letter-spacing:.02em;}
+input,select,textarea{font-size:13px;font-family:inherit;background:#fff;color:var(--text);border:1px solid var(--border2);border-radius:var(--radius);padding:8px 11px;width:100%;transition:border-color .15s;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(24,95,165,0.12);}
+textarea{resize:vertical;min-height:80px;line-height:1.5;}
+hr.div{border:none;border-top:1px solid var(--border);margin:18px 0;}
+.lf-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.lfc{border:1.5px dashed var(--border);border-radius:var(--radius-lg);padding:12px;cursor:pointer;transition:border-color .15s,background .15s,opacity .15s;background:var(--bg2);opacity:0.6;}
+.lfc:hover{border-color:#b0c8e8;background:#fafcff;opacity:0.85;}
+.lfc.selected{border:1.5px solid var(--blue);background:var(--blue-lt);opacity:1;}
+.lfc .lf-title{color:var(--text3);}
+.lfc.selected .lf-title{color:var(--text);}
+.lf-comment{margin-top:8px;width:100%;font-size:12px;padding:6px 9px;min-height:36px;border:1px dashed var(--border);background:transparent;color:var(--text3);opacity:0.55;resize:vertical;transition:opacity .15s,border-color .15s,background .15s,color .15s;}
+.lf-comment:focus{opacity:1;border:1px solid var(--blue);background:#fff;color:var(--text);box-shadow:0 0 0 3px rgba(24,95,165,0.12);}
+.lf-comment.has-text{opacity:1;border:1px solid var(--border2);background:#fff;color:var(--text);}
+.lf-head{display:flex;align-items:center;gap:7px;margin-bottom:4px;}
+.lf-icon{font-size:17px;color:var(--blue);}
+.lf-title{font-size:12px;font-weight:600;color:var(--text);}
+.lf-bullets{margin-bottom:8px;padding-left:2px;}
+.lf-bullet{font-size:11px;color:var(--text3);display:flex;align-items:baseline;gap:4px;line-height:1.5;}
+.lf-bullet::before{content:"•";flex-shrink:0;color:var(--blue);}
+.rr{display:flex;gap:4px;}
+.rb{flex:1;padding:5px 2px;font-size:11px;font-weight:600;border:1px solid var(--border);border-radius:6px;cursor:pointer;background:#fff;color:var(--text2);text-align:center;transition:all .12s;font-family:inherit;}
+.rb:hover{border-color:var(--border2);background:var(--bg2);}
+.rb.sno{background:#E8EEF2;border-color:#94A3B8;color:#4A5568;}
+.rb.s1{background:#DBEAFE;border-color:#60A5FA;color:#1D4ED8;}
+.rb.s2{background:#CCFBF1;border-color:#2DD4BF;color:#0F766E;}
+.rb.s3{background:#A5F3FC;border-color:#22D3EE;color:#0E7490;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;font-size:13px;font-weight:600;border-radius:var(--radius);cursor:pointer;font-family:inherit;border:none;transition:background .15s,transform .1s;}
+.btn:active{transform:scale(0.98);}
+.btn-primary{background:var(--blue);color:#fff;}
+.btn-primary:hover{background:var(--blue-dk);}
+.btn-secondary{background:#fff;color:var(--text);border:1px solid var(--border2);}
+.mic-btn{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:100px;border:1px solid var(--border2);background:#fff;color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s;}
+.mic-btn:hover{border-color:var(--blue);color:var(--blue);}
+.mic-btn.recording{background:#FEE2E2;border-color:#EF4444;color:#B91C1C;animation:micPulse 1.4s ease-in-out infinite;}
+@keyframes micPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.4);}50%{box-shadow:0 0 0 6px rgba(239,68,68,0);}}
+.mic-btn.unsupported{opacity:0.4;cursor:not-allowed;}
+.btn-secondary:hover{background:var(--bg2);}
+.btn-green{background:var(--green);color:#fff;}
+.btn-green:hover{background:#27500A;}
+.btn-outlook{background:#0078D4;color:#fff;}
+.btn-outlook:hover{background:#005A9E;}
+.btn-sm{padding:6px 12px;font-size:12px;}
+.btn-icon{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:5px 9px;cursor:pointer;font-size:14px;color:var(--text2);font-family:inherit;transition:all .12s;}
+.btn-icon:hover{background:var(--bg2);color:var(--text);}
+.btn-icon.danger:hover{background:var(--red-lt);color:var(--red);border-color:#e24b4a;}
+.form-actions{display:flex;align-items:center;gap:10px;margin-top:20px;flex-wrap:wrap;}
+.banner{display:flex;align-items:center;gap:8px;padding:11px 14px;border-radius:var(--radius);font-size:13px;margin-top:14px;}
+.banner-success{background:var(--green-lt);border:1px solid #97c459;color:var(--green);}
+.badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:100px;}
+.bno{background:#E8EEF2;color:#4A5568;}
+.b1{background:#DBEAFE;color:#1D4ED8;}
+.b2{background:#CCFBF1;color:#0F766E;}
+.b3{background:#A5F3FC;color:#0E7490;}
+.metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.mc{background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;}
+.mc .ml{font-size:11px;color:var(--text2);font-weight:600;margin-bottom:4px;}
+.mc .mv{font-size:26px;font-weight:700;color:var(--text);}
+.mc .ms{font-size:11px;color:var(--text3);margin-top:2px;}
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+.table-wrap{width:100%;overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{text-align:left;font-size:11px;font-weight:700;color:var(--text2);padding:8px 10px;border-bottom:2px solid var(--border);letter-spacing:.04em;white-space:nowrap;background:var(--bg2);}
+td{padding:9px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#fafcff;}
+.wt-list{display:flex;flex-direction:column;gap:12px;}
+.wi{background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;}
+.wi-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;gap:10px;}
+.wi-name{font-size:14px;font-weight:600;color:var(--text);}
+.wi-meta{font-size:11px;color:var(--text3);margin-bottom:8px;}
+.wi-tags{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;}
+.wi-fb{font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap;}
+.wi-section{padding-top:8px;border-top:1px solid var(--border);margin-top:8px;}
+.wi-section-label{font-size:10px;font-weight:700;color:var(--text2);margin-bottom:4px;letter-spacing:.04em;text-transform:uppercase;}
+.email-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding-top:10px;border-top:1px solid var(--border);margin-top:10px;}
+.copy-toast{display:none;align-items:center;gap:5px;background:var(--green-lt);border:1px solid #97c459;border-radius:var(--radius);padding:5px 10px;font-size:11px;color:var(--green);font-weight:600;}
+.notes-section{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+.note-label{font-size:10px;font-weight:700;color:var(--text2);margin-bottom:6px;letter-spacing:.04em;text-transform:uppercase;}
+.note-item{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px dashed var(--border);}
+.note-item:last-of-type{border-bottom:none;}
+.note-dot{width:7px;height:7px;border-radius:50%;background:var(--blue);flex-shrink:0;margin-top:5px;}
+.note-text{font-size:12px;color:var(--text2);flex:1;line-height:1.5;}
+.note-date{font-size:10px;color:var(--text3);white-space:nowrap;margin-top:2px;}
+.note-add-row{display:flex;gap:8px;margin-top:8px;}
+.note-add-row input{flex:1;font-size:12px;padding:6px 10px;}
+.p-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.p-row:last-child{border-bottom:none;}
+.p-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
+.p-name{font-size:13px;font-weight:600;color:var(--text);}
+.p-sub{font-size:11px;color:var(--text3);}
+.p-bar-w{width:80px;}
+.p-bar-bg{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;}
+.p-bar-f{height:6px;border-radius:3px;background:var(--blue);}
+.p-cnt{font-size:12px;color:var(--text2);min-width:20px;text-align:right;font-weight:600;}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.bar-lbl{font-size:11px;color:var(--text2);width:130px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bar-track{flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;}
+.bar-f{height:8px;border-radius:4px;}
+.bar-pct{font-size:11px;color:var(--text3);min-width:28px;text-align:right;font-weight:600;}
+.tp-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.tp-card{background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:16px;cursor:pointer;transition:border-color .15s,box-shadow .15s;}
+.tp-card:hover{border-color:var(--blue);box-shadow:0 2px 12px rgba(24,95,165,0.1);}
+.tp-av{width:38px;height:38px;border-radius:50%;background:var(--blue-lt);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;}
+.pv-back{background:none;border:none;cursor:pointer;font-size:13px;color:var(--text2);display:inline-flex;align-items:center;gap:5px;padding:0 0 14px;font-family:inherit;font-weight:600;}
+.pv-back:hover{color:var(--blue);}
+.tl-dot{width:10px;height:10px;border-radius:50%;background:var(--blue);flex-shrink:0;margin-top:4px;}
+.tl-line{width:2px;flex:1;background:var(--border);margin:5px auto 0;}
+.lm-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
+.lmi{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 14px;background:#fff;}
+.lmi-info{flex:1;}
+.lmi-title{font-size:13px;font-weight:600;color:var(--text);}
+.lmi-desc{font-size:11px;color:var(--text3);margin-top:2px;line-height:1.5;}
+.add-form,.edit-box{border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;background:var(--bg2);margin-bottom:16px;}
+.add-form h4,.edit-box h4{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:12px;}
+.ig{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+.io{padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;font-size:15px;background:#fff;transition:all .12s;}
+.io:hover,.io.sel{border-color:var(--blue);background:var(--blue-lt);}
+.filter-row{display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap;}
+.filter-row select{width:auto;font-size:12px;padding:7px 10px;}
+.filter-row label{font-size:12px;color:var(--text2);font-weight:600;white-space:nowrap;}
+.empty{text-align:center;padding:40px 20px;color:var(--text3);font-size:13px;}
+.heatmap-wrap{overflow-x:auto;padding-bottom:4px;}
+.heatmap-table{border-collapse:separate;border-spacing:4px;font-size:12px;}
+.heatmap-table th{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;padding:0 0 6px 0;text-align:center;white-space:nowrap;min-width:40px;}
+.heatmap-table th.hm-teacher-col{text-align:left;position:sticky;left:0;background:#fff;z-index:1;padding-right:14px;}
+.hm-teacher-cell{text-align:left;font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;padding-right:14px;position:sticky;left:0;background:#fff;}
+.hm-cell{width:40px;height:32px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;transition:transform .1s,box-shadow .1s;display:flex;align-items:center;justify-content:center;}
+.hm-cell:hover{transform:scale(1.1);box-shadow:0 2px 8px rgba(0,0,0,0.15);}
+.hm-0{background:var(--bg3);color:var(--text3);}
+.hm-1{background:#DBEAFE;color:#1D4ED8;}
+.hm-2{background:#93C5FD;color:#1E3A8A;}
+.hm-3{background:#3B82F6;color:#fff;}
+.hm-4{background:#185FA5;color:#fff;}
+.hm-legend{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);margin-top:12px;}
+.hm-legend-box{width:14px;height:14px;border-radius:3px;}
+.empty i{font-size:36px;display:block;margin-bottom:10px;color:var(--border2);}
+.rating-key{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border);}
+.rk-item{font-size:11px;color:var(--text2);display:flex;align-items:center;gap:5px;}
+.rk-pill{font-size:10px;font-weight:700;padding:2px 7px;border-radius:100px;}
+@media(max-width:640px){
+  .row2,.row3,.lf-grid,.dash-grid,.tp-grid,.metric-grid{grid-template-columns:1fr;}
+  .metric-grid{grid-template-columns:1fr 1fr;}
+}
+/* LOGIN */
+#login-screen{position:fixed;inset:0;background:var(--bg2);z-index:999;display:flex;align-items:center;justify-content:center;}
+.login-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius-lg);padding:36px 32px;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,0.08);}
+.login-logo{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:700;color:var(--blue);margin-bottom:6px;}
+.login-logo i{font-size:22px;}
+.login-sub{font-size:12px;color:var(--text3);margin-bottom:24px;}
+.login-label{font-size:11px;font-weight:600;color:var(--text2);display:block;margin-bottom:5px;}
+.login-input{width:100%;font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:var(--radius);font-family:inherit;margin-bottom:14px;}
+.login-input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(24,95,165,0.12);}
+.login-btn{width:100%;background:var(--blue);color:#fff;border:none;border-radius:var(--radius);padding:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+.login-btn:hover{background:var(--blue-dk);}
+.login-err{font-size:12px;color:var(--red);margin-top:10px;display:none;}
+.user-pill{display:flex;align-items:center;gap:7px;padding:6px 12px;background:var(--blue-lt);border-radius:100px;font-size:12px;font-weight:600;color:var(--blue);margin-left:auto;margin-right:12px;cursor:pointer;border:none;font-family:inherit;}
+.user-pill i{font-size:14px;}
+</style>
+</head>
+<body>
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo"><i class="ti ti-building-school"></i> WalkThru</div>
+    <div class="login-sub">Classroom Observation System — Please sign in</div>
+    <label class="login-label">Name</label>
+    <select id="login-name" class="login-input">
+      <option value="">Select your name...</option>
+    </select>
+    <label class="login-label">Password</label>
+    <input type="password" id="login-password" class="login-input" placeholder="Enter your password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-err" id="login-err">Incorrect password. Please try again.</div>
+  </div>
+</div>
+
+<nav class="nav">
+  <div class="nav-brand"><i class="ti ti-building-school"></i> WalkThru</div>
+  <div class="nav-tabs">
+    <button class="nt active" onclick="sv('walkthrough')" id="tab-walkthrough"><i class="ti ti-clipboard-list"></i> Walkthrough</button>
+    <button class="nt" onclick="sv('formal')" id="tab-formal"><i class="ti ti-file-text"></i> Formal Observation</button>
+    <button class="nt" onclick="sv('feedback')" id="tab-feedback"><i class="ti ti-message-dots"></i> Feedback</button>
+    <button class="nt" onclick="sv('teachers')" id="tab-teachers"><i class="ti ti-users"></i> Teachers</button>
+    <button class="nt" onclick="sv('dashboard')" id="tab-dashboard"><i class="ti ti-chart-bar"></i> <span id="tab-dashboard-label">CAO Dashboard</span></button>
+    <button class="nt" id="tab-settings" onclick="sv('settings')"><i class="ti ti-settings"></i> Look-Fors</button>
+  </div>
+  <button class="user-pill" id="user-pill" onclick="doLogout()" style="display:none;"><i class="ti ti-user"></i> <span id="user-pill-name"></span> <i class="ti ti-logout" style="font-size:12px;margin-left:2px;"></i></button>
+</nav>
+
+<!-- WALKTHROUGH -->
+<div class="view active" id="view-walkthrough">
+  <div class="card">
+    <div id="edit-banner" style="display:none;background:var(--blue-lt);border:1px solid #b0c8e8;border-radius:var(--radius-lg);padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--text);align-items:center;justify-content:space-between;">
+      <span><i class="ti ti-edit" style="vertical-align:-2px;margin-right:6px;"></i>Editing an existing walkthrough</span>
+      <button class="btn btn-secondary btn-sm" onclick="cancelEditWT()">Cancel Edit</button>
+    </div>
+    <div class="sec-label">Observation Details</div>
+    <div class="row2">
+      <div class="fg"><label>Observer</label><select id="observer"><option value="">Select observer...</option></select></div>
+      <div class="fg"><label>Teacher</label><select id="teacher-name"><option value="">Select teacher...</option></select></div>
+    </div>
+    <div class="row2">
+      <div class="fg"><label>Grade / Subject</label><input type="text" id="grade-subject" placeholder="e.g. 8th Grade Math"></div>
+      <div class="fg"><label>Date & Time</label><input type="datetime-local" id="obs-time"></div>
+    </div>
+    <hr class="div">
+    <div class="fg" style="margin-bottom:14px;">
+      <label style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Observation Notes <span style="font-weight:400;color:var(--text3);">— script or context notes (optional)</span></span>
+        <button type="button" class="mic-btn" id="mic-btn" onclick="toggleDictation('obs-notes','mic-btn')"><i class="ti ti-microphone"></i> <span>Dictate</span></button>
+      </label>
+      <textarea id="obs-notes" rows="3" placeholder="Script key moments, quotes, or context from the observation..."></textarea>
+    </div>
+    <hr class="div">
+    <div class="sec-label">Look-Fors — Click a card to include it, then select a rating</div>
+    <div class="rating-key">
+      <span class="rk-item"><span class="rk-pill bno">1</span></span>
+      <span class="rk-item"><span class="rk-pill b1">2</span></span>
+      <span class="rk-item"><span class="rk-pill b2">3</span></span>
+      <span class="rk-item"><span class="rk-pill b3">4</span></span>
+    </div>
+    <div class="lf-grid" id="lf-grid"></div>
+    <hr class="div">
+    <div style="margin-bottom:0;">
+      <div class="fg" style="margin-bottom:12px;">
+        <label>Powerful Practices</label>
+        <textarea id="feedback-highlights" rows="3" placeholder="Powerful practices from the observation..."></textarea>
+      </div>
+      <div class="fg" style="margin-bottom:0;">
+        <label>Reflections</label>
+        <textarea id="feedback-reflection" rows="4" placeholder="Reflections for the teacher to consider..."></textarea>
+      </div>
+    </div>
+    <div style="margin-bottom:12px;">
+      <button class="btn btn-secondary" id="btn-ai-draft" onclick="aiDraftFeedback()"><i class="ti ti-sparkles"></i> Draft Feedback with AI</button>
+      <span id="ai-draft-status" style="font-size:12px;color:var(--text3);margin-left:10px;display:none;"></span>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" id="btn-save-wt" onclick="submitWT()"><i class="ti ti-device-floppy"></i> Save Walkthrough</button>
+      <button class="btn btn-secondary" onclick="clearForm()">Clear Form</button>
+    </div>
+    <div id="success-banner" style="display:none"></div>
+  </div>
+</div>
+
+<!-- FORMAL OBSERVATION (fully independent form, separate IDs) -->
+<div class="view" id="view-formal">
+  <div class="card">
+    <div id="edit-banner-f" style="display:none;background:var(--blue-lt);border:1px solid #b0c8e8;border-radius:var(--radius-lg);padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--text);align-items:center;justify-content:space-between;">
+      <span><i class="ti ti-edit" style="vertical-align:-2px;margin-right:6px;"></i>Editing an existing formal observation</span>
+      <button class="btn btn-secondary btn-sm" onclick="cancelEditWTf()">Cancel Edit</button>
+    </div>
+    <div class="sec-label">Formal Observation Details</div>
+    <div class="row2">
+      <div class="fg"><label>Observer</label><select id="observer-f"><option value="">Select observer...</option></select></div>
+      <div class="fg"><label>Teacher</label><select id="teacher-name-f"><option value="">Select teacher...</option></select></div>
+    </div>
+    <div class="row2">
+      <div class="fg"><label>Grade / Subject</label><input type="text" id="grade-subject-f" placeholder="e.g. 8th Grade Math"></div>
+      <div class="fg"><label>Date & Time</label><input type="datetime-local" id="obs-time-f"></div>
+    </div>
+    <hr class="div">
+    <div class="fg" style="margin-bottom:14px;">
+      <label style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Observation Notes <span style="font-weight:400;color:var(--text3);">— script or context notes (optional)</span></span>
+        <button type="button" class="mic-btn" id="mic-btn-f" onclick="toggleDictation('obs-notes-f','mic-btn-f')"><i class="ti ti-microphone"></i> <span>Dictate</span></button>
+      </label>
+      <textarea id="obs-notes-f" rows="3" placeholder="Script key moments, quotes, or context from the observation..."></textarea>
+    </div>
+    <hr class="div">
+    <div class="sec-label">Look-Fors — Click a card to include it, then select a rating</div>
+    <div class="rating-key">
+      <span class="rk-item"><span class="rk-pill bno">1</span></span>
+      <span class="rk-item"><span class="rk-pill b1">2</span></span>
+      <span class="rk-item"><span class="rk-pill b2">3</span></span>
+      <span class="rk-item"><span class="rk-pill b3">4</span></span>
+    </div>
+    <div class="lf-grid" id="lf-grid-f"></div>
+    <hr class="div">
+    <div style="margin-bottom:0;">
+      <div class="fg" style="margin-bottom:12px;">
+        <label>Powerful Practices</label>
+        <textarea id="feedback-highlights-f" rows="3" placeholder="Powerful practices from the observation..."></textarea>
+      </div>
+      <div class="fg" style="margin-bottom:12px;">
+        <label>Opportunities for Growth</label>
+        <textarea id="opp-growth-f" rows="3" placeholder="Areas for the teacher to grow in..."></textarea>
+      </div>
+      <div class="fg" style="margin-bottom:0;">
+        <label>Reflections</label>
+        <textarea id="feedback-reflection-f" rows="4" placeholder="Reflections for the teacher to consider..."></textarea>
+      </div>
+    </div>
+    <div style="margin-bottom:12px;">
+      <button class="btn btn-secondary" id="btn-ai-draft-f" onclick="aiDraftFeedback(true)"><i class="ti ti-sparkles"></i> Draft Feedback with AI</button>
+      <span id="ai-draft-status-f" style="font-size:12px;color:var(--text3);margin-left:10px;display:none;"></span>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" id="btn-save-wt-f" onclick="submitWTf()"><i class="ti ti-device-floppy"></i> Save Formal Observation</button>
+      <button class="btn btn-secondary" onclick="clearFormF()">Clear Form</button>
+    </div>
+    <div id="success-banner-f" style="display:none"></div>
+  </div>
+</div>
+
+
+<!-- FEEDBACK -->
+<div class="view" id="view-feedback">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+    <div class="filter-row" style="margin-bottom:0;">
+      <label>Filter:</label>
+      <select id="filter-p" onchange="renderFB()"><option value="">All principals</option></select>
+      <select id="filter-r" onchange="renderFB()"><option value="">All ratings</option><option value="4">4 only</option><option value="3">3 and up</option><option value="2">2 and up</option><option value="1">1 and up</option></select>
+    </div>
+    <button class="btn btn-green btn-sm" onclick="exportXL()"><i class="ti ti-file-spreadsheet"></i> Export to Excel</button>
+  </div>
+  <div id="feedback-list"><div class="empty"><i class="ti ti-clipboard-text"></i>No walkthroughs yet. Submit one on the Walkthrough tab.</div></div>
+</div>
+
+<!-- TEACHERS -->
+<div class="view" id="view-teachers">
+  <div id="teacher-grid-view">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div class="sec-label" style="margin-bottom:0;">Teacher Profiles</div>
+      <div class="filter-row" style="margin-bottom:0;"><label>Filter by observer:</label><select id="tp-filter-p" onchange="renderTeacherGrid()"><option value="">All principals</option></select></div>
+    </div>
+    <div id="teacher-grid"><div class="empty"><i class="ti ti-users"></i>No teachers observed yet.</div></div>
+  </div>
+  <div id="teacher-profile-view" style="display:none;"></div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="view" id="view-dashboard">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div class="sec-label" style="margin-bottom:0;" id="dash-heading">CAO Overview</div>
+    <button class="btn btn-green btn-sm" onclick="exportXL()"><i class="ti ti-file-spreadsheet"></i> Export to Excel</button>
+  </div>
+  <div class="metric-grid">
+    <div class="mc"><div class="ml">Total Observations</div><div class="mv" id="m-total">0</div><div class="ms" id="m-total-sub">all principals</div></div>
+    <div class="mc"><div class="ml">Teachers Observed</div><div class="mv" id="m-teachers">0</div><div class="ms">unique classrooms</div></div>
+    <div class="mc"><div class="ml">Avg Rating</div><div class="mv" id="m-avg">—</div><div class="ms">across all look-fors</div></div>
+    <div class="mc"><div class="ml">Top Look-For</div><div class="mv" id="m-top" style="font-size:15px;padding-top:6px;">—</div><div class="ms">most frequently rated</div></div>
+  </div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+      <div class="card-title" style="margin-bottom:0;"><i class="ti ti-grid-dots"></i> <span id="heatmap-title">Teacher Observation Heatmap</span></div>
+      <div style="display:flex;align-items:center;gap:8px;" id="heatmap-filter-wrap">
+        <label style="font-size:11px;font-weight:600;color:var(--text2);">Principal:</label>
+        <select id="heatmap-filter-p" onchange="renderHeatmap()" style="width:auto;font-size:12px;padding:6px 10px;"></select>
+      </div>
+    </div>
+    <div class="heatmap-wrap"><table class="heatmap-table" id="heatmap-table"></table></div>
+    <div class="hm-legend">
+      <span>Fewer</span>
+      <div class="hm-legend-box hm-0"></div><div class="hm-legend-box hm-1"></div><div class="hm-legend-box hm-2"></div><div class="hm-legend-box hm-3"></div><div class="hm-legend-box hm-4"></div>
+      <span>More observations · click a cell for details</span>
+    </div>
+  </div>
+  <div class="dash-grid">
+    <div class="card" style="margin-bottom:0;" id="principal-bars-card"><div class="card-title"><i class="ti ti-users"></i> <span id="principal-bars-title">Walkthroughs by Principal</span></div><div id="principal-bars"><div class="empty" style="padding:16px;">No data yet</div></div></div>
+    <div class="card" style="margin-bottom:0;"><div class="card-title"><i class="ti ti-list-check"></i> Look-For Proficiency (avg)</div><div id="lookfor-bars"><div class="empty" style="padding:16px;">No data yet</div></div></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><i class="ti ti-sparkles"></i> AI Trend Analysis</div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:11px;font-weight:600;color:var(--text2);display:block;margin-bottom:6px;">Select a teacher to summarize</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <select id="dash-ai-teacher" style="width:auto;font-size:12px;padding:7px 10px;"><option value="">Choose teacher...</option></select>
+        <button class="btn btn-secondary btn-sm" onclick="aiDashTrend()"><i class="ti ti-sparkles"></i> Generate Summary</button>
+        <span id="dash-ai-status" style="font-size:12px;color:var(--text3);display:none;"></span>
+      </div>
+    </div>
+    <div id="dash-ai-result" style="display:none;background:var(--blue-lt);border:1px solid #b0c8e8;border-radius:var(--radius-lg);padding:14px 16px;font-size:13px;line-height:1.7;color:var(--text);white-space:pre-wrap;"></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><i class="ti ti-table"></i> Recent Observations</div>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Observer</th><th>Teacher</th><th>Grade/Subject</th><th>Overall</th><th>Feedback Preview</th></tr></thead><tbody id="dash-tbody"><tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px;">No observations submitted yet</td></tr></tbody></table></div>
+  </div>
+</div>
+
+<!-- HEATMAP DRILL-DOWN -->
+<div class="view" id="view-heatmap-detail">
+  <button class="btn btn-secondary btn-sm" style="margin-bottom:16px;" onclick="closeHeatmapDetail()"><i class="ti ti-arrow-left"></i> Back to Dashboard</button>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+    <div class="tp-av" id="hmd-av"></div>
+    <div>
+      <div style="font-size:18px;font-weight:700;color:var(--text);" id="hmd-teacher"></div>
+      <div style="font-size:12px;color:var(--text3);" id="hmd-month"></div>
+    </div>
+  </div>
+  <div id="hmd-list"></div>
+</div>
+
+<!-- SETTINGS -->
+<div class="view" id="view-settings">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div><div class="sec-label" style="margin-bottom:3px;">Manage Look-Fors</div><div style="font-size:12px;color:var(--text3);">Add, edit, or remove look-fors. Changes apply immediately.</div></div>
+    <button class="btn btn-primary btn-sm" onclick="toggleAddF()"><i class="ti ti-plus"></i> Add Look-For</button>
+  </div>
+  <div id="add-lf-form" style="display:none;" class="add-form">
+    <h4>New Look-For</h4>
+    <div class="row2" style="margin-bottom:10px;">
+      <div class="fg"><label>Title</label><input type="text" id="new-lf-title" placeholder="e.g. Student Talk Time"></div>
+      <div class="fg"><label>Indicators (one per line)</label><textarea id="new-lf-desc" rows="3" placeholder="Indicator one.&#10;Indicator two."></textarea></div>
+    </div>
+    <div style="margin-bottom:10px;"><label style="display:block;margin-bottom:6px;">Icon</label><div class="ig" id="icon-picker"></div></div>
+    <div style="display:flex;gap:8px;"><button class="btn btn-primary btn-sm" onclick="addLF()"><i class="ti ti-check"></i> Add</button><button class="btn btn-secondary btn-sm" onclick="toggleAddF()">Cancel</button></div>
+  </div>
+  <div id="edit-lf-form" style="display:none;" class="edit-box">
+    <h4>Edit Look-For</h4>
+    <div class="row2" style="margin-bottom:10px;">
+      <div class="fg"><label>Title</label><input type="text" id="edit-lf-title"></div>
+      <div class="fg"><label>Indicators (one per line)</label><textarea id="edit-lf-desc" rows="3"></textarea></div>
+    </div>
+    <div style="margin-bottom:10px;"><label style="display:block;margin-bottom:6px;">Icon</label><div class="ig" id="edit-icon-picker"></div></div>
+    <div style="display:flex;gap:8px;"><button class="btn btn-primary btn-sm" onclick="saveEdit()"><i class="ti ti-check"></i> Save</button><button class="btn btn-secondary btn-sm" onclick="cancelEdit()">Cancel</button></div>
+  </div>
+  <div class="lm-list" id="lf-manage-list"></div>
+  <hr class="div">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div><div class="sec-label" style="margin-bottom:3px;">Manage Teachers</div><div style="font-size:12px;color:var(--text3);">Add or remove teachers from the list. Changes apply immediately.</div></div>
+    <button class="btn btn-primary btn-sm" onclick="toggleAddT()"><i class="ti ti-plus"></i> Add Teacher</button>
+  </div>
+  <div id="add-t-form" style="display:none;" class="add-form">
+    <h4>New Teacher</h4>
+    <div class="row2" style="margin-bottom:10px;">
+      <div class="fg"><label>Name</label><input type="text" id="new-t-name" placeholder="e.g. Smith" onkeydown="if(event.key==='Enter')addTeacher()"></div>
+    </div>
+    <div style="display:flex;gap:8px;"><button class="btn btn-primary btn-sm" onclick="addTeacher()"><i class="ti ti-check"></i> Add</button><button class="btn btn-secondary btn-sm" onclick="toggleAddT()">Cancel</button></div>
+  </div>
+  <div class="lm-list" id="teacher-manage-list"></div>
+  <hr class="div">
+  <div class="sec-label">Principals</div>
+  <p style="font-size:12px;color:var(--text3);margin-bottom:12px;">Edit names to match your staff. Changes apply immediately.</p>
+  <div id="principal-editor"></div>
+</div>
+
+<script>
+const ICONS=['ti-target','ti-users','ti-message-question','ti-brain','ti-message-dots','ti-heart','ti-adjustments','ti-device-laptop','ti-book','ti-pencil','ti-star','ti-award','ti-bulb','ti-eye','ti-chart-line','ti-clock','ti-puzzle','ti-list-check','ti-school','ti-microphone','ti-presentation','ti-writing'];
+const PC=['#E6F1FB','#EAF3DE','#FAEEDA','#FBEAF0'];
+const PT=['#185FA5','#3B6D11','#854F0B','#993556'];
+
+const RATINGS=[
+  {key:'1', label:'1', cls:'sno',badgeCls:'bno',score:1},
+  {key:'2', label:'2', cls:'s1', badgeCls:'b1', score:2},
+  {key:'3', label:'3', cls:'s2', badgeCls:'b2', score:3},
+  {key:'4', label:'4', cls:'s3', badgeCls:'b3', score:4},
+];
+// ============================================================
+//  LOGIN SYSTEM
+//  Each principal has their own password.
+//  Rebecca Smith is the admin and can see everything.
+//  Update passwords here before deploying.
+// ============================================================
+const USERS = [
+  {name:'Rebecca Smith',   email:'rebecca.smith@bellevuechristian.org',       password:'rebecca',  admin:true},
+  {name:'Corrine Nield',   email:'corrine.nield@bellevuechristian.org',       password:'corrine',  admin:false},
+  {name:'Jayna Harris',    email:'jayna.harris@bellevuechristian.org',        password:'jayna',    admin:false},
+  {name:'Jordana Halkett', email:'jordana.halkett@bellevuechristian.org',     password:'jordana',  admin:false},
+  {name:'Mike Olson',      email:'mike.olson@bellevuechristian.org',          password:'mike',     admin:false},
+  {name:'Stephanie Andreotti',email:'stephanie.andreotti@bellevuechristian.org',password:'stephanie',admin:false},
+];
+
+let currentUser = null;
+
+function initLoginScreen(){
+  const sel = document.getElementById('login-name');
+  sel.innerHTML = '<option value="">Select your name...</option>' +
+    USERS.map(u=>`<option value="${u.name}">${u.name}</option>`).join('');
+}
+
+function doLogin(){
+  const name = document.getElementById('login-name').value;
+  const pwd  = document.getElementById('login-password').value;
+  const err  = document.getElementById('login-err');
+  const user = USERS.find(u=>u.name===name && u.password===pwd);
+  if(!user){err.style.display='block';return;}
+  err.style.display='none';
+  currentUser = user;
+  sessionStorage.setItem('wt_user', JSON.stringify({name:user.name, email:user.email, admin:user.admin}));
+  applyLogin();
+}
+
+function doLogout(){
+  sessionStorage.removeItem('wt_user');
+  currentUser=null;
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('login-password').value='';
+  document.getElementById('user-pill').style.display='none';
+  // Hide settings tab for all on logout
+  document.getElementById('tab-settings').style.display='';
+}
+
+function applyLogin(){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('user-pill').style.display='flex';
+  document.getElementById('user-pill-name').textContent=currentUser.name;
+  // Non-admins: hide Look-Fors settings tab
+  document.getElementById('tab-settings').style.display=currentUser.admin?'':'none';
+  // Relabel the dashboard tab: admin sees the full CAO Dashboard, principals see their own
+  document.getElementById('tab-dashboard-label').textContent=currentUser.admin?'CAO Dashboard':'My Dashboard';
+  // Refresh teacher dropdowns now that we know who's logged in (filters by assignment)
+  initDropdowns();
+  // Pre-select the observer dropdown to current user (both forms)
+  ['observer','observer-f'].forEach(id=>{
+    const obs=document.getElementById(id);
+    if(obs){
+      [...obs.options].forEach(o=>{if(o.value===currentUser.name)o.selected=true;});
+      obs.disabled=!currentUser.admin;
+    }
+  });
+  sv('walkthrough');
+}
+
+// Filter walkthroughs by current user if not admin
+function visibleWalkthroughs(){
+  if(!currentUser||currentUser.admin) return walkthroughs;
+  // Show every observation for any teacher assigned to this principal, regardless of who observed them.
+  // Teachers with no assignments are visible to everyone by default (see teachersFor()).
+  const myTeachers=new Set(teachersFor(currentUser.name,false).map(t=>tKey(t)));
+  return walkthroughs.filter(w=>myTeachers.has(tKey(w.teacher)));
+}
+
+
+//  AI feedback drafting & trend summaries are sent through /api/claude
+//  (a server-side proxy — see api/claude.js). The Anthropic API key now
+//  lives only in your Vercel project's environment variables, never in
+//  this file or the browser.
+// ============================================================
+
+async function callClaude(prompt){
+  const r = await fetch('/.netlify/functions/claude',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ prompt })
+  });
+  if(!r.ok){const e=await r.text();throw new Error('API error: '+e);}
+  const d=await r.json();
+  return d.text||'';
+}
+
+async function aiDraftFeedback(isFormal){
+  const sfx=isFormal?'-f':'';
+  const form=isFormal?'fo':'wt';
+  const st=formState[form];
+  const principal=document.getElementById('observer'+sfx).value;
+  const teacher=document.getElementById('teacher-name'+sfx).value.trim();
+  const grade=document.getElementById('grade-subject'+sfx).value.trim();
+  const obsNotes=document.getElementById('obs-notes'+sfx).value.trim();
+  const selected=lookFors.filter(lf=>st.selLF[lf.id]);
+  if(!teacher||!selected.length){alert('Please select a teacher and at least one look-for first.');return;}
+  const btn=document.getElementById('btn-ai-draft'+sfx);
+  const status=document.getElementById('ai-draft-status'+sfx);
+  btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Drafting...';
+  status.style.display='inline';status.textContent='AI is writing feedback...';
+  const ratingSummary=selected.map(lf=>{const c=st.lfComments[lf.id];return `• ${lf.title}: ${st.ratings[lf.id]||'Not Rated'}/4${c?' — Observer comment: '+c:''}`;}).join('\n');
+  const prompt=`You are an instructional coach writing post-observation feedback for a teacher. Write in a warm, professional, growth-oriented tone.
+
+Observer: ${principal||'Principal'}
+Teacher: ${teacher}
+Grade/Subject: ${grade||'Not specified'}
+${obsNotes?'Observation notes: '+obsNotes+'\n':''}
+Look-For Ratings (scale of 1-4, where 4 is highest/most effective):
+${ratingSummary}
+
+Write ${isFormal?'three sections':'two sections'}:
+POWERFUL PRACTICES:
+2-3 sentences noting specific strengths observed. Be specific and genuine.
+${isFormal?`
+OPPORTUNITIES FOR GROWTH:
+2-3 sentences identifying specific, constructive areas for the teacher to develop. Frame as growth-oriented, not critical.
+`:''}
+REFLECTIONS:
+2-3 sentences with a thoughtful coaching question or area to consider. Frame as an invitation to reflect, not a criticism.
+
+Formatting rules — follow exactly:
+- Do not use asterisks anywhere, including for emphasis or at the start/end of any section.
+- Do not use em dashes or en dashes (— or –). Use a comma, period, or the word "and" instead.
+- Return only the section heading(s) exactly as written above, followed by plain prose sentences. No extra commentary, no markdown formatting.`;
+  try{
+    const text=await callClaude(prompt);
+    const hlMatch=text.match(/POWERFUL PRACTICES:\s*([\s\S]*?)(?=OPPORTUNITIES FOR GROWTH:|REFLECTIONS:|$)/i);
+    const ogMatch=text.match(/OPPORTUNITIES FOR GROWTH:\s*([\s\S]*?)(?=REFLECTIONS:|$)/i);
+    const rfMatch=text.match(/REFLECTIONS:\s*([\s\S]*?)$/i);
+    const clean=s=>s.trim().replace(/^\*+|\*+$/g,'').replace(/[—–]/g,', ').replace(/\s{2,}/g,' ').trim();
+    if(hlMatch?.[1])document.getElementById('feedback-highlights'+sfx).value=clean(hlMatch[1]);
+    if(isFormal&&ogMatch?.[1])document.getElementById('opp-growth-f').value=clean(ogMatch[1]);
+    if(rfMatch?.[1])document.getElementById('feedback-reflection'+sfx).value=clean(rfMatch[1]);
+    status.textContent='✓ Feedback drafted — review and edit before saving.';
+  }catch(e){
+    status.textContent='⚠ AI unavailable. Please write feedback manually.';
+    console.warn('AI draft error:',e);
+  }
+  btn.disabled=false;btn.innerHTML='<i class="ti ti-sparkles"></i> Draft Feedback with AI';
+}
+
+async function aiTrendSummary(teacherName, targetId){
+  const wts=tWTs(teacherName);
+  if(wts.length<2){alert('Need at least 2 observations to generate a trend summary.');return;}
+  const el=document.getElementById(targetId);
+  if(!el)return;
+  el.style.display='block';el.innerHTML='Generating trend summary...';
+  const obsText=wts.slice(0,10).map((w,i)=>`Observation ${i+1} (${w.date}) by ${w.principal}:
+  Overall: ${w.overallRating}/4
+  Look-Fors: ${w.selectedData.map(d=>d.title+': '+d.rating+'/4'+(d.comment?' ('+d.comment+')':'')).join(', ')}
+  ${w.fbHighlights?'Powerful Practices: '+w.fbHighlights:''}
+  ${w.fbReflection?'Reflections: '+w.fbReflection:''}`).join('\n\n');
+  const prompt=`You are an instructional coach reviewing classroom observation data for a teacher named ${teacherName}. Analyze their growth and patterns across multiple observations. Ratings are on a 1-4 scale where 4 is most effective.
+
+${obsText}
+
+Write a trend summary in exactly this format, with no extra commentary before or after:
+
+STRENGTHS:
+- [bullet point]
+- [bullet point]
+- [bullet point]
+
+OPPORTUNITIES FOR GROWTH:
+- [bullet point]
+- [bullet point]
+
+Each bullet should be one specific, concrete sentence. Write in a warm, professional, coaching tone.
+
+Formatting rules — follow exactly:
+- Do not use asterisks anywhere, including for emphasis or as bullet markers. Use a hyphen (-) for bullets only, as shown above.
+- Do not use em dashes or en dashes (— or –). Use a comma, period, or the word "and" instead.
+- This summary will be shared directly with the teacher. Do not mention any numbers, scores, or ratings (such as "3 out of 4" or "rated a 4") anywhere in the summary. Describe strengths and growth areas in plain, qualitative language only, the way you would speak to the teacher in person.`;
+  try{
+    const text=await callClaude(prompt);
+    el.innerHTML=formatTrendSummary(text);
+  }catch(e){
+    el.innerHTML='⚠ AI unavailable. Please try again later.';
+    console.warn('AI trend error:',e);
+  }
+}
+
+function formatTrendSummary(text){
+  const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const clean=s=>s
+    .replace(/\*+/g,'')
+    .replace(/[—–]/g,', ')
+    .replace(/\b[1-4](\.\d)?\s*(\/|out of)\s*4\b/gi,'') // strip stray score mentions like "3/4" or "3 out of 4"
+    .replace(/\brated?\s+(a|an)?\s*[1-4](\.\d)?\b/gi,'') // strip "rated a 3" style phrasing
+    .replace(/\s{2,}/g,' ')
+    .replace(/\s+([,.])/g,'$1') // clean up any double spacing/punctuation left behind by the strips above
+    .trim();
+  const lines=text.trim().split('\n').map(l=>clean(l.trim())).filter(Boolean);
+  let html='';let inList=false;
+  lines.forEach(line=>{
+    if(/^(STRENGTHS|OPPORTUNITIES FOR GROWTH)\s*:?$/i.test(line)){
+      if(inList){html+='</ul>';inList=false;}
+      html+=`<div style="font-weight:700;font-size:12px;letter-spacing:0.02em;text-transform:uppercase;color:var(--blue);margin:${html?'14px':'0'} 0 6px;">${esc(line.replace(/:$/,''))}</div>`;
+    }else if(/^[-•]\s*/.test(line)){
+      if(!inList){html+='<ul style="margin:0;padding-left:18px;">';inList=true;}
+      html+=`<li style="margin-bottom:4px;">${esc(line.replace(/^[-•]\s*/,''))}</li>`;
+    }else{
+      if(inList){html+='</ul>';inList=false;}
+      html+=`<div style="margin-bottom:6px;">${esc(line)}</div>`;
+    }
+  });
+  if(inList)html+='</ul>';
+  return html||esc(text);
+}
+
+async function aiDashTrend(){
+  const sel=document.getElementById('dash-ai-teacher');
+  const teacherName=sel?.value;
+  if(!teacherName){alert('Please select a teacher first.');return;}
+  const wts=tWTs(teacherName);
+  if(wts.length<2){alert('Need at least 2 observations to generate a trend summary.');return;}
+  const btn=document.querySelector('[onclick="aiDashTrend()"]');
+  const status=document.getElementById('dash-ai-status');
+  const result=document.getElementById('dash-ai-result');
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Generating...';}
+  status.style.display='inline';status.textContent='AI is analyzing observations...';
+  result.style.display='none';
+  const obsText=wts.slice(0,10).map((w,i)=>`Observation ${i+1} (${w.date}) by ${w.principal}:
+  Overall: ${w.overallRating}/4
+  Look-Fors: ${w.selectedData.map(d=>d.title+': '+d.rating+'/4'+(d.comment?' ('+d.comment+')':'')).join(', ')}
+  ${w.fbHighlights?'Powerful Practices: '+w.fbHighlights:''}
+  ${w.fbReflection?'Reflections: '+w.fbReflection:''}`).join('\n\n');
+  const prompt=`You are an instructional coach reviewing classroom observation data for a teacher named ${teacherName}. Analyze their growth and patterns across multiple observations. Ratings are on a 1-4 scale where 4 is most effective.
+
+${obsText}
+
+Write a trend summary in exactly this format, with no extra commentary before or after:
+
+STRENGTHS:
+- [bullet point]
+- [bullet point]
+- [bullet point]
+
+OPPORTUNITIES FOR GROWTH:
+- [bullet point]
+- [bullet point]
+
+Each bullet should be one specific, concrete sentence. Write in a warm, professional, coaching tone.
+
+Formatting rules — follow exactly:
+- Do not use asterisks anywhere, including for emphasis or as bullet markers. Use a hyphen (-) for bullets only, as shown above.
+- Do not use em dashes or en dashes (— or –). Use a comma, period, or the word "and" instead.
+- This summary will be shared directly with the teacher. Do not mention any numbers, scores, or ratings (such as "3 out of 4" or "rated a 4") anywhere in the summary. Describe strengths and growth areas in plain, qualitative language only, the way you would speak to the teacher in person.`;
+  try{
+    const text=await callClaude(prompt);
+    result.style.display='block';result.innerHTML=formatTrendSummary(text);
+    status.textContent='';
+  }catch(e){
+    result.style.display='block';result.innerHTML='⚠ AI unavailable. Please try again later.';
+    status.textContent='';
+    console.warn('AI dash trend error:',e);
+  }
+  if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-sparkles"></i> Generate Summary';}
+}
+
+
+//  Steps to configure:
+//  1. Go to https://supabase.com and create a free account & project
+//  2. In your project, go to SQL Editor and run:
+//       create table walkthroughs (
+//         id text primary key,
+//         data jsonb not null,
+//         created_at timestamptz default now()
+//       );
+//     Then enable Row Level Security and add a policy:
+//       create policy "Allow all" on walkthroughs for all using (true) with check (true);
+//  3. Go to Settings > API and copy your Project URL and anon/public key below
+// ============================================================
+const SB_URL = 'https://ypswzsblbyyinixksser.supabase.co';   // e.g. https://xyzxyz.supabase.co
+const SB_KEY = 'sb_publishable_0ThUtwJ51u67ITxoowGOBA_yK76Bex3';      // starts with eyJ...
+const SB_TABLE = 'walkthroughs';
+
+function sbHeaders(){
+  const isNewKey = SB_KEY.startsWith('sb_');
+  return {
+    'Content-Type':'application/json',
+    'apikey': SB_KEY,
+    'Authorization': isNewKey ? `Bearer ${SB_KEY}` : `Bearer ${SB_KEY}`,
+    'Prefer': 'return=minimal'
+  };
+}
+
+function sbReadHeaders(){
+  return {
+    'apikey': SB_KEY,
+    'Accept':'application/json'
+  };
+}
+
+async function saveToSharePoint(wt){
+  // Called saveToSharePoint to avoid renaming all call sites — actually saves to Supabase
+  if(!SB_URL || SB_URL.indexOf('YOUR_SUPABASE')===0){console.warn('Supabase not configured yet');return false;}
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/${SB_TABLE}`,{
+      method:'POST',
+      headers:{...sbHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({id:String(wt.id),data:wt})
+    });
+    if(r.ok||r.status===201||r.status===204){console.log('Saved to Supabase');return true;}
+    const err=await r.text();console.warn('Supabase save failed:',err);return false;
+  }catch(e){console.warn('Supabase error:',e);return false;}
+}
+
+async function deleteFromSupabase(wtId){
+  if(!SB_URL || SB_URL.indexOf('YOUR_SUPABASE')===0){console.warn('Supabase not configured yet');return false;}
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/${SB_TABLE}?id=eq.${encodeURIComponent(String(wtId))}`,{
+      method:'DELETE',
+      headers:sbHeaders()
+    });
+    if(r.ok||r.status===204){console.log('Deleted from Supabase');return true;}
+    const err=await r.text();console.warn('Supabase delete failed:',err);return false;
+  }catch(e){console.warn('Supabase delete error:',e);return false;}
+}
+
+async function loadFromSharePoint(){
+  // Called loadFromSharePoint to avoid renaming all call sites — actually loads from Supabase
+  if(!SB_URL || SB_URL.indexOf('YOUR_SUPABASE')===0){console.warn('Supabase not configured yet');return false;}
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/${SB_TABLE}?select=data&order=created_at.desc&limit=1000`,{
+      headers:sbReadHeaders()
+    });
+    if(!r.ok)return false;
+    const rows=await r.json();
+    const all=rows.map(row=>row.data).filter(Boolean);
+    // The settings record is stored with a reserved id of "_settings" in the same table
+    const settingsRow=all.find(d=>d&&d.__isSettings);
+    if(settingsRow){
+      if(settingsRow.teachers&&settingsRow.teachers.length)teachers=settingsRow.teachers;
+      if(settingsRow.lookFors&&settingsRow.lookFors.length)lookFors=settingsRow.lookFors;
+      if(settingsRow.principals&&settingsRow.principals.length)principals=settingsRow.principals;
+      if(settingsRow.teacherAssignments)teacherAssignments=settingsRow.teacherAssignments;
+      saveSettings();
+    }
+    const sbWTs=all.filter(d=>d&&!d.__isSettings);
+    // Keep local-only items not yet synced, merge with server data
+    const localOnly=walkthroughs.filter(w=>w.synced!==true&&!sbWTs.find(s=>String(s.id)===String(w.id)));
+    walkthroughs=[...localOnly,...sbWTs];
+    saveData();
+    return true;
+  }catch(e){console.warn('Supabase load error:',e);return false;}
+}
+
+async function saveSettingsToCloud(){
+  if(!SB_URL || SB_URL.indexOf('YOUR_SUPABASE')===0){console.warn('Supabase not configured yet — settings saved locally only');return false;}
+  try{
+    const payload={__isSettings:true,teachers,lookFors,principals,teacherAssignments};
+    const r=await fetch(`${SB_URL}/rest/v1/${SB_TABLE}`,{
+      method:'POST',
+      headers:{...sbHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({id:'_settings',data:payload})
+    });
+    if(r.ok||r.status===201||r.status===204){console.log('Settings synced to Supabase');return true;}
+    const err=await r.text();console.warn('Settings cloud save failed:',err);return false;
+  }catch(e){console.warn('Settings cloud save error:',e);return false;}
+}
+
+function ratingByLabel(label){return RATINGS.find(r=>r.label===label)||RATINGS[0];}
+function badgeCls(label){const r=RATINGS.find(r=>r.label===label);return r?r.badgeCls:'bno';}
+
+let lookFors=[
+  {id:'lc',icon:'ti-target',      title:'Learning Clarity',
+   bullets:['Instruction on content and skills is clear and appropriate for students\u2019 learning needs.','Directions, explanations, and expectations are communicated clearly.']},
+  {id:'cc',icon:'ti-heart',       title:'Classroom Culture',
+   bullets:['Respectful interactions among teachers and students.','Classroom routines and procedures support a productive learning environment.']},
+  {id:'se',icon:'ti-users',       title:'Student Engagement',
+   bullets:['Students are actively engaged in the assigned task.','Students are talking, writing, creating, solving, or responding about the learning.','Teacher checks for understanding from all students and responds by clarifying, probing, or adjusting instruction.']},
+  {id:'at',icon:'ti-brain',       title:'Academic Thinking',
+   bullets:['Students explain, justify, analyze, compare, or create.','Students engage in academic discourse with peers.']},
+  {id:'bw',icon:'ti-book',        title:'Biblical Worldview Shaping',
+   bullets:['Teacher makes relevant connections between learning and Biblical worldview.','Teacher models through relationship and discipleship.']},
+  {id:'ti',icon:'ti-device-laptop',title:'Technology Integration',
+   bullets:['The teacher monitors ethical and appropriate technology use.','Technology use requires students to create, collaborate, investigate, or demonstrate understanding.']},
+];
+
+let principals=['Corrine Nield','Jayna Harris','Jordana Halkett','Mike Olson','Rebecca Smith','Stephanie Andreotti'];
+let teachers=['Ahnert','Barfield','Bengelink','Bennett','Cairns','Cannon','Carpenter','Clark','Cobbley','Cortwright','Cotton','Crawford','Crowe','Curran','Daly','DeFreece','Doyle','Durst','Edwards','Eichholz','Fudge','Gallion','Gershon','Gill','Grishko','Hanson','Hart','Hatate','Henry','Hogan','Hunt','Jensen','Kelly','Kim','Kimball','Kinman','Lin','McGowan','McMurray','Nieto','Pavao','Pelone','Peterson','Pridmore','Riss','Schmer','Shepherd','Sonheim','Sorensen','Stanton','Taleno','Teng','Washington','Wasserman','Wicks','Wishart','Young'];
+// Maps teacher name -> array of principal names who supervise them.
+// A teacher with no entry here (or an empty array) is visible to ALL principals by default,
+// so nothing breaks until assignments are made.
+let teacherAssignments={};
+function teachersFor(principalName,isAdmin){
+  if(isAdmin)return teachers;
+  return teachers.filter(t=>{
+    const assigned=teacherAssignments[t];
+    return !assigned||!assigned.length||assigned.includes(principalName);
+  });
+}
+let walkthroughs=[],selIcon=ICONS[0],editId=null,editSelIcon=ICONS[0];
+
+function sv(n){
+  if(dictationActiveField&&n!=='walkthrough'&&n!=='formal')stopDictation();
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nt').forEach(t=>t.classList.remove('active'));
+  document.getElementById('view-'+n).classList.add('active');
+  document.getElementById('tab-'+n).classList.add('active');
+  if(n==='settings'){renderManage();renderTeacherManage();renderPEditor();}
+  if(n==='teachers'){document.getElementById('teacher-grid-view').style.display='block';document.getElementById('teacher-profile-view').style.display='none';renderTeacherGrid();}
+  if(n==='feedback')renderFB();
+  if(n==='dashboard'){updateDash();renderHeatmap();}
+}
+function initDropdowns(){
+  ['observer','observer-f','filter-p','tp-filter-p'].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    const cur=el.value;
+    const base=id.startsWith('observer')?'<option value="">Select observer...</option>':'<option value="">All principals</option>';
+    el.innerHTML=base+principals.map(p=>`<option${p===cur?' selected':''}>${p}</option>`).join('');
+  });
+  const visibleTeachers=currentUser?teachersFor(currentUser.name,currentUser.admin):teachers;
+  ['teacher-name','teacher-name-f'].forEach(id=>{
+    const tn=document.getElementById(id);
+    if(tn){const cur=tn.value;tn.innerHTML='<option value="">Select teacher...</option>'+visibleTeachers.map(t=>`<option${t===cur?' selected':''}>${t}</option>`).join('');}
+  });
+}
+function bulletsHtml(bullets){return `<div class="lf-bullets">${(bullets||[]).map(b=>`<div class="lf-bullet">${b}</div>`).join('')}</div>`;}
+
+// Two fully independent form states: 'wt' (Walkthrough) and 'fo' (Formal Observation)
+const formState={
+  wt:{selLF:{},ratings:{},lfComments:{}},
+  fo:{selLF:{},ratings:{},lfComments:{}}
+};
+function gridIdFor(form){return form==='fo'?'lf-grid-f':'lf-grid';}
+
+function renderLFGridFor(form){
+  const st=formState[form];
+  document.getElementById(gridIdFor(form)).innerHTML=lookFors.map(lf=>{
+    const btns=RATINGS.map(r=>`<button class="rb${st.ratings[lf.id]===r.label?' '+r.cls:''}" onclick="sRatingFor('${form}','${lf.id}','${r.label}','${r.cls}',this)">${r.key}</button>`).join('');
+    const cmt=st.lfComments[lf.id]||'';
+    return `<div class="lfc${st.selLF[lf.id]?' selected':''}" id="lfc-${form}-${lf.id}" onclick="if(event.target.classList.contains('rb')||event.target.classList.contains('lf-comment'))return;tLFFor('${form}','${lf.id}')">
+      <div class="lf-head"><i class="ti ${lf.icon} lf-icon"></i><span class="lf-title">${lf.title}</span></div>
+      ${bulletsHtml(lf.bullets)}
+      <div class="rr">${btns}</div>
+      <textarea class="lf-comment${cmt?' has-text':''}" placeholder="Add a comment (optional)..." onclick="event.stopPropagation()" oninput="formState['${form}'].lfComments['${lf.id}']=this.value;this.classList.toggle('has-text',this.value.length>0)">${cmt}</textarea>
+    </div>`;
+  }).join('');
+}
+function tLFFor(form,id){
+  const st=formState[form];
+  if(st.selLF[id]){delete st.selLF[id];delete st.ratings[id];delete st.lfComments[id];}else{st.selLF[id]=true;}
+  renderLFGridFor(form);
+}
+function sRatingFor(form,id,label,cls,btn){
+  const st=formState[form];
+  st.selLF[id]=true;st.ratings[id]=label;
+  btn.closest('.rr').querySelectorAll('.rb').forEach(b=>b.className='rb');
+  btn.className='rb '+cls;
+  document.getElementById('lfc-'+form+'-'+id).classList.add('selected');
+}
+// Backward-compatible wrappers for the Walkthrough form (form='wt')
+function renderLFGrid(){renderLFGridFor('wt');}
+function tLF(id){tLFFor('wt',id);}
+function sRating(id,label,cls,btn){sRatingFor('wt',id,label,cls,btn);}
+
+function getOR(sd){
+  const scored=sd.filter(d=>ratingByLabel(d.rating).score>0);
+  if(!scored.length)return'—';
+  const avg=scored.reduce((s,d)=>s+ratingByLabel(d.rating).score,0)/scored.length;
+  return avg.toFixed(1);
+}
+function tKey(n){return n.trim().toLowerCase();}
+function tWTs(n){return walkthroughs.filter(w=>tKey(w.teacher)===tKey(n));}
+function tInit(n){return n.replace(/^(Ms\.|Mr\.|Mrs\.|Dr\.)\s*/,'').split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();}
+// ============================================================
+//  VOICE DICTATION — Web Speech API
+//  Supported in Chrome, Edge, and Safari (desktop and mobile).
+//  Not supported in Firefox. Falls back gracefully with a message.
+// ============================================================
+let dictationRecognition=null;
+let dictationActiveField=null;
+let dictationBaseText='';
+
+function getSpeechRecognition(){
+  return window.SpeechRecognition||window.webkitSpeechRecognition||null;
+}
+
+function toggleDictation(fieldId,btnId){
+  const SR=getSpeechRecognition();
+  const btn=document.getElementById(btnId);
+  if(!SR){
+    alert('Voice dictation isn\'t supported in this browser. Please try Chrome or Edge, or type your notes manually.');
+    return;
+  }
+  // If already recording (on this or another field), stop it first
+  if(dictationRecognition&&dictationActiveField){
+    stopDictation();
+    if(dictationActiveField===fieldId)return; // user clicked the same mic to stop — done
+  }
+  startDictation(fieldId,btnId);
+}
+
+function startDictation(fieldId,btnId){
+  const SR=getSpeechRecognition();
+  const field=document.getElementById(fieldId);
+  const btn=document.getElementById(btnId);
+  if(!field||!btn)return;
+  dictationBaseText=field.value?field.value.trim()+' ':'';
+  dictationActiveField=fieldId;
+  dictationRecognition=new SR();
+  dictationRecognition.continuous=true;
+  dictationRecognition.interimResults=true;
+  dictationRecognition.lang='en-US';
+
+  dictationRecognition.onresult=(event)=>{
+    let finalText='',interimText='';
+    for(let i=0;i<event.results.length;i++){
+      const transcript=event.results[i][0].transcript;
+      if(event.results[i].isFinal)finalText+=transcript+' ';
+      else interimText+=transcript;
+    }
+    field.value=dictationBaseText+finalText+interimText;
+  };
+  dictationRecognition.onerror=(event)=>{
+    console.warn('Dictation error:',event.error);
+    if(event.error==='not-allowed'||event.error==='service-not-allowed'){
+      alert('Microphone access was blocked. Please allow microphone permissions for this site and try again.');
+    }
+    stopDictation();
+  };
+  dictationRecognition.onend=()=>{
+    // If it ended on its own (e.g. silence timeout) but the user hasn't clicked stop, restart it
+    if(dictationActiveField===fieldId){
+      try{dictationRecognition.start();}catch(e){stopDictation();}
+    }
+  };
+  try{
+    dictationRecognition.start();
+    btn.classList.add('recording');
+    btn.querySelector('span').textContent='Listening...';
+  }catch(e){
+    console.warn('Could not start dictation:',e);
+    stopDictation();
+  }
+}
+
+function stopDictation(){
+  const fieldId=dictationActiveField;
+  dictationActiveField=null; // clear first so onend doesn't auto-restart
+  if(dictationRecognition){
+    try{dictationRecognition.stop();}catch(e){}
+    dictationRecognition=null;
+  }
+  if(fieldId){
+    const btnId=fieldId==='obs-notes'?'mic-btn':'mic-btn-f';
+    const btn=document.getElementById(btnId);
+    if(btn){btn.classList.remove('recording');btn.querySelector('span').textContent='Dictate';}
+    const field=document.getElementById(fieldId);
+    if(field)field.value=field.value.trim();
+  }
+}
+
+// Hide/disable mic buttons up front if the browser truly doesn't support dictation
+// (script runs at end of body, so DOM is already ready — no need to wait for DOMContentLoaded)
+(function(){
+  if(!getSpeechRecognition()){
+    ['mic-btn','mic-btn-f'].forEach(id=>{
+      const btn=document.getElementById(id);
+      if(btn){btn.classList.add('unsupported');btn.title='Voice dictation is not supported in this browser';}
+    });
+  }
+})();
+
+function fmtTime(dtLocal){
+  if(!dtLocal)return'';
+  const parts=dtLocal.split('T');
+  if(parts.length<2)return'';
+  const [h,m]=parts[1].split(':').map(Number);
+  if(isNaN(h)||isNaN(m))return'';
+  const ampm=h>=12?'PM':'AM';
+  const h12=h%12===0?12:h%12;
+  return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+function firstName(n){return (n||'').replace(/^(Ms\.|Mr\.|Mrs\.|Dr\.)\s*/i,'').trim().split(' ')[0]||n;}
+
+let editingWtId=null,editingWtIdF=null;
+
+function submitWT(){
+  if(dictationActiveField==='obs-notes')stopDictation();
+  const principal=document.getElementById('observer').value;
+  const teacher=document.getElementById('teacher-name').value.trim();
+  const email='';
+  const grade=document.getElementById('grade-subject').value.trim();
+  const time=document.getElementById('obs-time').value;
+  const obsNotes=document.getElementById('obs-notes').value.trim();
+  const fbHighlights=document.getElementById('feedback-highlights').value.trim();
+  const fbReflection=document.getElementById('feedback-reflection').value.trim();
+  const fbText=[fbHighlights?'POWERFUL PRACTICES:\n'+fbHighlights:'',fbReflection?'REFLECTIONS:\n'+fbReflection:''].filter(Boolean).join('\n\n');
+  const st=formState.wt;
+  if(!principal||!teacher||!Object.keys(st.selLF).length){alert('Please select a principal, enter a teacher name, and select at least one look-for.');return;}
+  const sd=lookFors.filter(lf=>st.selLF[lf.id]).map(lf=>({title:lf.title,rating:st.ratings[lf.id]||'1',comment:st.lfComments[lf.id]||''}));
+  const type='Walkthrough';
+
+  if(editingWtId){
+    const wt=walkthroughs.find(w=>String(w.id)===String(editingWtId));
+    if(!wt){alert('Could not find that record to update.');cancelEditWT();return;}
+    if(!(currentUser&&(currentUser.admin||currentUser.name===wt.principal))){alert('You do not have permission to edit this record.');cancelEditWT();return;}
+    Object.assign(wt,{principal,teacher,email,grade,time,obsNotes,feedbackText:fbText,fbHighlights,fbReflection,oppGrowth:'',selectedData:sd,overallRating:getOR(sd),type,synced:false});
+    saveData();updateDash();renderFB();
+    saveToSharePoint(wt).then(ok=>{if(ok){wt.synced=true;saveData();}});
+    const banner=document.getElementById('success-banner');
+    banner.style.display='flex';banner.className='banner banner-success';
+    banner.innerHTML=`<i class="ti ti-circle-check"></i> ${type} updated! Switching to Feedback tab...`;
+    cancelEditWT();
+    setTimeout(()=>sv('feedback'),1600);
+    return;
+  }
+
+  const wt={id:String(Date.now()),principal,teacher,email,grade,time,obsNotes,feedbackText:fbText,fbHighlights,fbReflection,oppGrowth:'',selectedData:sd,date:new Date().toLocaleDateString(),isoDate:new Date().toISOString(),overallRating:getOR(sd),type,followUpNotes:[],synced:false};
+  walkthroughs.unshift(wt);saveData();updateDash();renderFB();
+  saveToSharePoint(wt).then(ok=>{
+    if(ok){wt.synced=true;saveData();}
+    else{console.warn('Saved locally only — cloud unavailable');}
+  });
+  const banner=document.getElementById('success-banner');
+  banner.style.display='flex';banner.className='banner banner-success';
+  banner.innerHTML=`<i class="ti ti-circle-check"></i> ${type} saved! Switching to Feedback tab...`;
+  setTimeout(()=>sv('feedback'),1600);
+}
+
+function submitWTf(){
+  if(dictationActiveField==='obs-notes-f')stopDictation();
+  const principal=document.getElementById('observer-f').value;
+  const teacher=document.getElementById('teacher-name-f').value.trim();
+  const email='';
+  const grade=document.getElementById('grade-subject-f').value.trim();
+  const time=document.getElementById('obs-time-f').value;
+  const obsNotes=document.getElementById('obs-notes-f').value.trim();
+  const fbHighlights=document.getElementById('feedback-highlights-f').value.trim();
+  const oppGrowth=document.getElementById('opp-growth-f').value.trim();
+  const fbReflection=document.getElementById('feedback-reflection-f').value.trim();
+  const fbText=[fbHighlights?'POWERFUL PRACTICES:\n'+fbHighlights:'',oppGrowth?'OPPORTUNITIES FOR GROWTH:\n'+oppGrowth:'',fbReflection?'REFLECTIONS:\n'+fbReflection:''].filter(Boolean).join('\n\n');
+  const st=formState.fo;
+  if(!principal||!teacher||!Object.keys(st.selLF).length){alert('Please select a principal, enter a teacher name, and select at least one look-for.');return;}
+  const sd=lookFors.filter(lf=>st.selLF[lf.id]).map(lf=>({title:lf.title,rating:st.ratings[lf.id]||'1',comment:st.lfComments[lf.id]||''}));
+  const type='Formal Observation';
+
+  if(editingWtIdF){
+    const wt=walkthroughs.find(w=>String(w.id)===String(editingWtIdF));
+    if(!wt){alert('Could not find that record to update.');cancelEditWTf();return;}
+    if(!(currentUser&&(currentUser.admin||currentUser.name===wt.principal))){alert('You do not have permission to edit this record.');cancelEditWTf();return;}
+    Object.assign(wt,{principal,teacher,email,grade,time,obsNotes,feedbackText:fbText,fbHighlights,fbReflection,oppGrowth,selectedData:sd,overallRating:getOR(sd),type,synced:false});
+    saveData();updateDash();renderFB();
+    saveToSharePoint(wt).then(ok=>{if(ok){wt.synced=true;saveData();}});
+    const banner=document.getElementById('success-banner-f');
+    banner.style.display='flex';banner.className='banner banner-success';
+    banner.innerHTML=`<i class="ti ti-circle-check"></i> ${type} updated! Switching to Feedback tab...`;
+    cancelEditWTf();
+    setTimeout(()=>sv('feedback'),1600);
+    return;
+  }
+
+  const wt={id:String(Date.now()),principal,teacher,email,grade,time,obsNotes,feedbackText:fbText,fbHighlights,fbReflection,oppGrowth,selectedData:sd,date:new Date().toLocaleDateString(),isoDate:new Date().toISOString(),overallRating:getOR(sd),type,followUpNotes:[],synced:false};
+  walkthroughs.unshift(wt);saveData();updateDash();renderFB();
+  saveToSharePoint(wt).then(ok=>{
+    if(ok){wt.synced=true;saveData();}
+    else{console.warn('Saved locally only — cloud unavailable');}
+  });
+  const banner=document.getElementById('success-banner-f');
+  banner.style.display='flex';banner.className='banner banner-success';
+  banner.innerHTML=`<i class="ti ti-circle-check"></i> ${type} saved! Switching to Feedback tab...`;
+  setTimeout(()=>sv('feedback'),1600);
+}
+
+function editWT(wtId){
+  const wt=walkthroughs.find(w=>String(w.id)===String(wtId));
+  if(!wt)return;
+  if(wt.type==='Formal Observation'){editWTf(wtId);return;}
+  if(!(currentUser&&(currentUser.admin||currentUser.name===wt.principal))){alert('You do not have permission to edit this record.');return;}
+  editingWtId=wt.id;
+  document.getElementById('observer').value=wt.principal;
+  document.getElementById('observer').disabled=!currentUser.admin;
+  document.getElementById('teacher-name').value=wt.teacher;
+  document.getElementById('grade-subject').value=wt.grade||'';
+  document.getElementById('obs-time').value=wt.time||'';
+  document.getElementById('obs-notes').value=wt.obsNotes||'';
+  document.getElementById('feedback-highlights').value=wt.fbHighlights||'';
+  document.getElementById('feedback-reflection').value=wt.fbReflection||'';
+  const st=formState.wt;
+  st.selLF={};st.ratings={};st.lfComments={};
+  (wt.selectedData||[]).forEach(d=>{
+    const lf=lookFors.find(l=>l.title===d.title);
+    if(lf){st.selLF[lf.id]=true;st.ratings[lf.id]=d.rating;st.lfComments[lf.id]=d.comment||'';}
+  });
+  renderLFGrid();
+  document.getElementById('edit-banner').style.display='flex';
+  document.getElementById('btn-save-wt').innerHTML='<i class="ti ti-device-floppy"></i> Update Walkthrough';
+  document.getElementById('success-banner').style.display='none';
+  sv('walkthrough');
+}
+
+function editWTf(wtId){
+  const wt=walkthroughs.find(w=>String(w.id)===String(wtId));
+  if(!wt)return;
+  if(!(currentUser&&(currentUser.admin||currentUser.name===wt.principal))){alert('You do not have permission to edit this record.');return;}
+  editingWtIdF=wt.id;
+  document.getElementById('observer-f').value=wt.principal;
+  document.getElementById('observer-f').disabled=!currentUser.admin;
+  document.getElementById('teacher-name-f').value=wt.teacher;
+  document.getElementById('grade-subject-f').value=wt.grade||'';
+  document.getElementById('obs-time-f').value=wt.time||'';
+  document.getElementById('obs-notes-f').value=wt.obsNotes||'';
+  document.getElementById('feedback-highlights-f').value=wt.fbHighlights||'';
+  document.getElementById('opp-growth-f').value=wt.oppGrowth||'';
+  document.getElementById('feedback-reflection-f').value=wt.fbReflection||'';
+  const st=formState.fo;
+  st.selLF={};st.ratings={};st.lfComments={};
+  (wt.selectedData||[]).forEach(d=>{
+    const lf=lookFors.find(l=>l.title===d.title);
+    if(lf){st.selLF[lf.id]=true;st.ratings[lf.id]=d.rating;st.lfComments[lf.id]=d.comment||'';}
+  });
+  renderLFGridFor('fo');
+  document.getElementById('edit-banner-f').style.display='flex';
+  document.getElementById('btn-save-wt-f').innerHTML='<i class="ti ti-device-floppy"></i> Update Formal Observation';
+  document.getElementById('success-banner-f').style.display='none';
+  sv('formal');
+}
+
+function cancelEditWT(){
+  editingWtId=null;
+  document.getElementById('edit-banner').style.display='none';
+  const obs=document.getElementById('observer');
+  if(obs&&currentUser)obs.disabled=!currentUser.admin;
+  clearForm();
+  document.getElementById('btn-save-wt').innerHTML='<i class="ti ti-device-floppy"></i> Save Walkthrough';
+}
+
+function cancelEditWTf(){
+  editingWtIdF=null;
+  document.getElementById('edit-banner-f').style.display='none';
+  const obs=document.getElementById('observer-f');
+  if(obs&&currentUser)obs.disabled=!currentUser.admin;
+  clearFormF();
+  document.getElementById('btn-save-wt-f').innerHTML='<i class="ti ti-device-floppy"></i> Save Formal Observation';
+}
+
+function deleteWT(wtId){
+  const wt=walkthroughs.find(w=>String(w.id)===String(wtId));
+  if(!wt)return;
+  if(!(currentUser&&(currentUser.admin||currentUser.name===wt.principal))){alert('You do not have permission to delete this record.');return;}
+  if(!confirm('Permanently delete this '+(wt.type||'Walkthrough').toLowerCase()+' for '+wt.teacher+' ('+wt.date+')? This cannot be undone.'))return;
+  walkthroughs=walkthroughs.filter(w=>String(w.id)!==String(wtId));
+  saveData();updateDash();renderFB();
+  if(document.getElementById('teacher-profile-view').style.display!=='none')renderProfile(wt.teacher);
+  if(String(editingWtId)===String(wtId))cancelEditWT();
+  if(String(editingWtIdF)===String(wtId))cancelEditWTf();
+  deleteFromSupabase(wtId).then(ok=>{
+    if(!ok)console.warn('Deleted locally — cloud deletion may not have completed. It could reappear after next sync.');
+  });
+}
+
+function clearForm(){
+  if(dictationActiveField==='obs-notes')stopDictation();
+  ['teacher-name','grade-subject','obs-notes','feedback-highlights','feedback-reflection'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  if(!editingWtId){
+    const obs=document.getElementById('observer');
+    if(obs && !(currentUser&&!currentUser.admin)) obs.value='';
+  }
+  document.getElementById('success-banner').style.display='none';
+  formState.wt.selLF={};formState.wt.ratings={};formState.wt.lfComments={};renderLFGrid();
+}
+
+function clearFormF(){
+  if(dictationActiveField==='obs-notes-f')stopDictation();
+  ['teacher-name-f','grade-subject-f','obs-notes-f','feedback-highlights-f','opp-growth-f','feedback-reflection-f'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  if(!editingWtIdF){
+    const obs=document.getElementById('observer-f');
+    if(obs && !(currentUser&&!currentUser.admin)) obs.value='';
+  }
+  document.getElementById('success-banner-f').style.display='none';
+  formState.fo.selLF={};formState.fo.ratings={};formState.fo.lfComments={};renderLFGridFor('fo');
+}
+function printObservation(wtId){
+  const wt=walkthroughs.find(w=>String(w.id)===String(wtId));if(!wt)return;
+  const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const lfRows=wt.selectedData.map(d=>`<tr>
+      <td style="padding:8px 10px;border:1px solid #ccc;font-weight:600;">${esc(d.title)}</td>
+      <td style="padding:8px 10px;border:1px solid #ccc;text-align:center;width:60px;">${esc(d.rating)}/4</td>
+      <td style="padding:8px 10px;border:1px solid #ccc;color:#444;">${esc(d.comment)||'—'}</td>
+    </tr>`).join('');
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Formal Observation — ${esc(wt.teacher)} — ${esc(wt.date)}</title>
+  <style>
+    body{font-family:Georgia,'Times New Roman',serif;color:#1a1a1a;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.5;}
+    h1{font-size:20px;margin-bottom:2px;border-bottom:2px solid #1a1a1a;padding-bottom:10px;}
+    .sub{color:#555;font-size:13px;margin-bottom:24px;}
+    .meta{display:flex;gap:40px;margin-bottom:24px;font-size:13px;}
+    .meta div b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:#777;font-weight:600;margin-bottom:2px;}
+    h2{font-size:14px;text-transform:uppercase;letter-spacing:0.04em;color:#333;border-bottom:1px solid #ccc;padding-bottom:6px;margin-top:28px;}
+    table{border-collapse:collapse;width:100%;margin-top:10px;font-size:13px;}
+    .section-text{font-size:13px;white-space:pre-wrap;margin-top:8px;}
+    .overall{display:inline-block;background:#f0f0f0;border:1px solid #ccc;border-radius:4px;padding:4px 12px;font-weight:600;font-size:13px;}
+    @media print{body{margin:0;padding:20px;}}
+  </style></head>
+  <body>
+    <h1>Formal Classroom Observation</h1>
+    <div class="sub">Bellevue Christian School — Office of Academic Affairs</div>
+    <div class="meta">
+      <div><b>Teacher</b>${esc(wt.teacher)}</div>
+      <div><b>Observer</b>${esc(wt.principal)}</div>
+      <div><b>Grade / Subject</b>${esc(wt.grade)||'—'}</div>
+      <div><b>Date</b>${esc(wt.date)}</div>
+    </div>
+    <div class="overall">Overall Rating: ${esc(wt.overallRating)}/4</div>
+    ${wt.obsNotes?`<h2>Observation Notes</h2><div class="section-text">${esc(wt.obsNotes)}</div>`:''}
+    <h2>Look-Fors</h2>
+    <table>
+      <thead><tr>
+        <th style="padding:8px 10px;border:1px solid #ccc;text-align:left;background:#f5f5f5;">Look-For</th>
+        <th style="padding:8px 10px;border:1px solid #ccc;background:#f5f5f5;">Rating</th>
+        <th style="padding:8px 10px;border:1px solid #ccc;text-align:left;background:#f5f5f5;">Comment</th>
+      </tr></thead>
+      <tbody>${lfRows}</tbody>
+    </table>
+    ${wt.fbHighlights?`<h2>Powerful Practices</h2><div class="section-text">${esc(wt.fbHighlights)}</div>`:''}
+    ${wt.oppGrowth?`<h2>Opportunities for Growth</h2><div class="section-text">${esc(wt.oppGrowth)}</div>`:''}
+    ${wt.fbReflection?`<h2>Reflections</h2><div class="section-text">${esc(wt.fbReflection)}</div>`:''}
+  </body></html>`;
+  const win=window.open('','_blank');
+  if(!win){alert('Please allow pop-ups for this site to print.');return;}
+  win.document.write(html);
+  win.document.close();
+  win.onload=()=>{win.focus();win.print();};
+}
+
+function openOutlook(wtId){
+  const wt=walkthroughs.find(w=>String(w.id)===String(wtId));if(!wt)return;
+  const sub=encodeURIComponent(`Classroom Observation Feedback — ${wt.date}`);
+  const highlightsSection=wt.fbHighlights?'Powerful Practices\n'+wt.fbHighlights:'';
+  const oppSection=wt.oppGrowth?'Opportunities for Growth\n'+wt.oppGrowth:'';
+  const reflectionsSection=wt.fbReflection?'Reflections\n'+wt.fbReflection:'';
+  const senderName=currentUser?currentUser.name:wt.principal;
+  const senderEmail=currentUser?currentUser.email:'';
+  const sections=[highlightsSection,oppSection,reflectionsSection].filter(Boolean).join('\n\n');
+  const body=`Hi ${wt.teacher},\n\nThank you for welcoming me into your classroom today. I appreciated the opportunity to spend time with your students and observe the learning taking place. Below are a few highlights from the lesson, along with some reflections for your consideration as you continue to support student growth.\n\n${sections}\n\nThank you again for opening your classroom and for the care you invest in your students each day. If you would like to discuss any of the observations or reflections, I would be happy to continue the conversation.\n\n${senderName}`;
+  const mailto=senderEmail?`mailto:${wt.email||''}?from=${encodeURIComponent(senderEmail)}&subject=${sub}&body=${encodeURIComponent(body)}`:`mailto:?subject=${sub}&body=${encodeURIComponent(body)}`;
+  window.location.href=mailto;
+}
+function copyFeedback(wtId,toastId){
+  const wt=walkthroughs.find(w=>String(w.id)===String(wtId));if(!wt)return;
+  const text=`Classroom Observation Feedback — ${wt.date}\nTeacher: ${wt.teacher}\nObserved by: ${wt.principal}\n\n${wt.feedbackText||'(No written feedback provided.)'}`;
+  navigator.clipboard.writeText(text).catch(()=>{const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);});
+  const toast=document.getElementById(toastId);if(toast){toast.style.display='flex';setTimeout(()=>toast.style.display='none',2200);}
+}
+function addNote(wtId,inputId,refresh){
+  const inp=document.getElementById(inputId);if(!inp)return;
+  const text=inp.value.trim();if(!text)return;
+  const wt=walkthroughs.find(w=>String(w.id)===String(wtId));if(!wt)return;
+  wt.followUpNotes.push({text,date:new Date().toLocaleDateString(),id:Date.now()});saveData();
+  inp.value='';if(refresh==='fb')renderFB();if(refresh==='profile')renderProfile(wt.teacher);
+}
+function renderFB(){
+  const container=document.getElementById('feedback-list');
+  const fp=document.getElementById('filter-p')?.value||'';
+  const fr=document.getElementById('filter-r')?.value||'';
+  let filtered=visibleWalkthroughs();
+  if(fp)filtered=filtered.filter(w=>w.principal===fp);
+  if(fr)filtered=filtered.filter(w=>{
+    const v=parseFloat(w.overallRating);
+    if(isNaN(v))return false;
+    return fr==='4'?v>=3.95:v>=parseFloat(fr);
+  });
+  if(!filtered.length){container.innerHTML=`<div class="empty"><i class="ti ti-clipboard-text"></i>${walkthroughs.length?'No walkthroughs match this filter.':'No walkthroughs yet. Submit one on the Walkthrough tab.'}</div>`;return;}
+  container.innerHTML='<div class="wt-list">'+filtered.map(w=>{
+    const notesHtml=w.followUpNotes.map(n=>`<div class="note-item"><div class="note-dot"></div><div class="note-text">${n.text}</div><div class="note-date">${n.date}</div></div>`).join('');
+    return `<div class="wi">
+      <div class="wi-header">
+        <div><span class="wi-name">${firstName(w.teacher)}</span>${w.grade?`<span style="font-size:11px;color:var(--text3);margin-left:8px;">${w.grade}</span>`:''}${w.type==='Formal Observation'?'<span class="badge" style="background:#FEF3C7;color:#92400E;margin-left:8px;">Formal Observation</span>':''}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;"><span class="badge ${badgeCls(w.overallRating)}">${w.overallRating}</span><span style="font-size:11px;color:var(--text3);">${w.date}${fmtTime(w.time)?' · '+fmtTime(w.time):''}</span></div>
+      </div>
+      <div class="wi-meta">${w.principal}</div>
+      <div class="wi-tags">${w.selectedData.map(d=>`<span class="badge ${badgeCls(d.rating)}">${d.title}: ${d.rating}</span>`).join('')}</div>
+      ${w.fbHighlights?`<div class="wi-section"><div class="wi-section-label">Powerful Practices</div><div class="wi-fb">${w.fbHighlights}</div></div>`:''}
+      ${w.oppGrowth?`<div class="wi-section"><div class="wi-section-label">Opportunities for Growth</div><div class="wi-fb">${w.oppGrowth}</div></div>`:''}
+      ${w.fbReflection?`<div class="wi-section"><div class="wi-section-label">Reflections</div><div class="wi-fb">${w.fbReflection}</div></div>`:''}
+      ${!w.fbHighlights&&!w.fbReflection&&!w.oppGrowth?'<div style="font-size:12px;color:var(--text3);font-style:italic;margin-top:8px;">No written feedback recorded for this observation.</div>':''}
+      <div class="email-row">
+        ${(currentUser&&(currentUser.admin||currentUser.name===w.principal))?`<button class="btn btn-secondary btn-sm" onclick="editWT(${w.id})"><i class="ti ti-edit"></i> Edit</button><button class="btn btn-secondary btn-sm" style="color:var(--red);" onclick="deleteWT(${w.id})"><i class="ti ti-trash"></i> Delete</button>`:''}
+        ${w.type==='Formal Observation'?`<button class="btn btn-secondary btn-sm" onclick="printObservation(${w.id})"><i class="ti ti-printer"></i> Print</button>`:''}
+        <button class="btn btn-outlook btn-sm" onclick="openOutlook(${w.id})"><i class="ti ti-mail"></i> Open in Outlook</button>
+        <button class="btn btn-secondary btn-sm" onclick="copyFeedback(${w.id},'toast-${w.id}')"><i class="ti ti-copy"></i> Copy Feedback</button>
+        <div class="copy-toast" id="toast-${w.id}"><i class="ti ti-check"></i> Copied!</div>
+        ${!w.email?'<span style="font-size:11px;color:var(--text3);"><i class="ti ti-info-circle" style="vertical-align:-2px;margin-right:3px;"></i>Add teacher email on walkthrough form for direct send</span>':''}
+      </div>
+      <div class="notes-section">
+        <div class="note-label"><i class="ti ti-notes" style="vertical-align:-2px;margin-right:4px;"></i>Follow-Up Notes${w.followUpNotes.length?' ('+w.followUpNotes.length+')':''}</div>
+        ${notesHtml}
+        <div class="note-add-row">
+          <input type="text" id="note-${w.id}" placeholder="Add a follow-up note..." onkeydown="if(event.key==='Enter')addNote(${w.id},'note-${w.id}','fb')">
+          <button class="btn btn-primary btn-sm" onclick="addNote(${w.id},'note-${w.id}','fb')"><i class="ti ti-plus"></i></button>
+        </div>
+      </div>
+    </div>`;
+  }).join('')+'</div>';
+}
+function renderTeacherGrid(){
+  const fp=document.getElementById('tp-filter-p')?.value||'';
+  const all=[...new Map(visibleWalkthroughs().map(w=>[tKey(w.teacher),w])).values()];
+  const filtered=fp?all.filter(w=>w.principal===fp):all;
+  const grid=document.getElementById('teacher-grid');
+  if(!filtered.length){grid.innerHTML='<div class="empty"><i class="ti ti-users"></i>No teachers observed yet.</div>';return;}
+  grid.innerHTML='<div class="tp-grid">'+filtered.map(w=>{
+    const wts=tWTs(w.teacher);
+    const scored=wts.filter(x=>parseFloat(x.overallRating)>0);
+    const avg=scored.length?scored.reduce((s,x)=>s+parseFloat(x.overallRating),0)/scored.length:0;
+    const avgLabel=avg>0?avg.toFixed(1):'—';
+    const totalNotes=wts.reduce((s,x)=>s+x.followUpNotes.length,0);
+    return `<div class="tp-card" onclick="renderProfile('${w.teacher.replace(/'/g,"\\'")}')">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;"><div class="tp-av">${tInit(w.teacher)}</div><div><div style="font-size:14px;font-weight:600;color:var(--text);">${w.teacher}</div><div style="font-size:11px;color:var(--text3);">${w.grade||''}${w.email?' · '+w.email:''}</div></div></div>
+      <div style="display:flex;gap:14px;margin-bottom:10px;">
+        <span style="font-size:12px;color:var(--text2);"><strong style="color:var(--text);">${wts.length}</strong> observation${wts.length!==1?'s':''}</span>
+        <span style="font-size:12px;color:var(--text2);">Avg: <strong style="color:var(--text);">${avgLabel}</strong></span>
+        ${totalNotes?`<span style="font-size:12px;color:var(--text2);"><strong style="color:var(--text);">${totalNotes}</strong> note${totalNotes!==1?'s':''}</span>`:''}
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;">${[...new Set(wts.map(x=>x.principal))].map(p=>`<span class="badge b2">${p}</span>`).join('')}</div>
+    </div>`;
+  }).join('')+'</div>';
+}
+function renderProfile(teacherName){
+  document.getElementById('teacher-grid-view').style.display='none';
+  const pv=document.getElementById('teacher-profile-view');pv.style.display='block';
+  const wts=tWTs(teacherName),inits=tInit(teacherName);
+  const scored=wts.filter(x=>parseFloat(x.overallRating)>0);
+  const avg=scored.length?scored.reduce((s,x)=>s+parseFloat(x.overallRating),0)/scored.length:0;
+  const avgLabel=avg>0?avg.toFixed(1):'—';
+  const email=wts[0]?.email||'',totalNotes=wts.reduce((s,x)=>s+x.followUpNotes.length,0);
+  pv.innerHTML=`
+    <button class="pv-back" onclick="showTeacherGrid()"><i class="ti ti-arrow-left"></i> All Teachers</button>
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+        <div class="tp-av" style="width:48px;height:48px;font-size:16px;">${inits}</div>
+        <div><div style="font-size:18px;font-weight:700;color:var(--text);">${teacherName}</div>
+        <div style="font-size:12px;color:var(--text3);">${email||'No email on file'} · ${wts.length} observation${wts.length!==1?'s':''} · Avg: ${avgLabel} · ${totalNotes} note${totalNotes!==1?'s':''}</div></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border);">
+        ${email?`<button class="btn btn-outlook btn-sm" onclick="openOutlook(${wts[0]?.id})"><i class="ti ti-mail"></i> Email in Outlook</button>`:''}
+        <button class="btn btn-secondary btn-sm" onclick="copyFeedback(${wts[0]?.id},'ptost-${inits}')"><i class="ti ti-copy"></i> Copy Latest Feedback</button>
+        <button class="btn btn-secondary btn-sm" onclick="aiTrendSummary('${teacherName.replace(/'/g,"\\'")}','trend-${inits}')"><i class="ti ti-sparkles"></i> AI Trend Summary</button>
+        <div class="copy-toast" id="ptost-${inits}"><i class="ti ti-check"></i> Copied!</div>
+      </div>
+      <div id="trend-${inits}" style="display:none;background:var(--blue-lt);border:1px solid #b0c8e8;border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:16px;font-size:13px;line-height:1.7;color:var(--text);white-space:pre-wrap;"></div>
+      <div class="sec-label">Observation Timeline</div>
+      ${wts.map((w,i)=>{
+        const notesHtml=w.followUpNotes.map(n=>`<div class="note-item"><div class="note-dot"></div><div class="note-text">${n.text}</div><div class="note-date">${n.date}</div></div>`).join('');
+        return `<div style="display:flex;gap:14px;padding:14px 0;border-bottom:${i<wts.length-1?'1px solid var(--border)':'none'};">
+          <div style="display:flex;flex-direction:column;align-items:center;padding-top:4px;"><div class="tl-dot"></div>${i<wts.length-1?'<div class="tl-line"></div>':''}</div>
+          <div style="flex:1;">
+            <div style="font-size:11px;color:var(--text3);margin-bottom:3px;">${w.date}${fmtTime(w.time)?' · '+fmtTime(w.time):''} · ${w.principal} <span class="badge ${badgeCls(w.overallRating)}" style="margin-left:6px;">${w.overallRating}</span>${w.type==='Formal Observation'?'<span class="badge" style="background:#FEF3C7;color:#92400E;margin-left:6px;">Formal Observation</span>':''}</div>
+            <div style="font-size:13px;font-weight:600;margin-bottom:6px;">${w.grade||'Classroom Observation'}</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">${w.selectedData.map(d=>`<span class="badge ${badgeCls(d.rating)}">${d.title}: ${d.rating}</span>`).join('')}</div>
+            ${w.feedbackText?`<div style="font-size:12px;color:var(--text2);line-height:1.7;white-space:pre-wrap;margin-bottom:10px;">${w.feedbackText}</div>`:'<div style="font-size:12px;color:var(--text3);font-style:italic;margin-bottom:10px;">No written feedback recorded.</div>'}
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+              ${(currentUser&&(currentUser.admin||currentUser.name===w.principal))?`<button class="btn btn-secondary btn-sm" onclick="editWT(${w.id})"><i class="ti ti-edit"></i> Edit</button><button class="btn btn-secondary btn-sm" style="color:var(--red);" onclick="deleteWT(${w.id})"><i class="ti ti-trash"></i> Delete</button>`:''}
+              ${w.type==='Formal Observation'?`<button class="btn btn-secondary btn-sm" onclick="printObservation(${w.id})"><i class="ti ti-printer"></i> Print</button>`:''}
+              <button class="btn btn-outlook btn-sm" onclick="openOutlook(${w.id})"><i class="ti ti-mail"></i> Email in Outlook</button>
+              <button class="btn btn-secondary btn-sm" onclick="copyFeedback(${w.id},'ptost-${inits}')"><i class="ti ti-copy"></i> Copy</button>
+            </div>
+            <div class="notes-section" style="margin-top:0;padding-top:10px;">
+              <div class="note-label">Follow-Up Notes</div>${notesHtml}
+              <div class="note-add-row">
+                <input type="text" id="pnote-${w.id}" placeholder="Add a follow-up note..." onkeydown="if(event.key==='Enter')addNoteP(${w.id},'${teacherName.replace(/'/g,"\\'")}')">
+                <button class="btn btn-primary btn-sm" onclick="addNoteP(${w.id},'${teacherName.replace(/'/g,"\\'")}')"><i class="ti ti-plus"></i></button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+function addNoteP(wtId,tn){const inp=document.getElementById('pnote-'+wtId);if(!inp)return;const text=inp.value.trim();if(!text)return;const wt=walkthroughs.find(w=>String(w.id)===String(wtId));if(!wt)return;wt.followUpNotes.push({text,date:new Date().toLocaleDateString(),id:Date.now()});saveData();inp.value='';renderProfile(tn);}
+function showTeacherGrid(){document.getElementById('teacher-grid-view').style.display='block';document.getElementById('teacher-profile-view').style.display='none';renderTeacherGrid();}
+function updateDash(){
+  const vw=visibleWalkthroughs();
+  const isAdmin=currentUser&&currentUser.admin;
+  const headingEl=document.getElementById('dash-heading');
+  if(headingEl)headingEl.textContent=isAdmin?'CAO Overview':'My Dashboard';
+  const totalSubEl=document.getElementById('m-total-sub');
+  if(totalSubEl)totalSubEl.textContent=isAdmin?'all principals':'your assigned teachers';
+  const dashTeacher=document.getElementById('dash-ai-teacher');
+  if(dashTeacher){
+    const cur=dashTeacher.value;
+    const uniqueTeachers=[...new Set(vw.map(w=>w.teacher))].sort();
+    dashTeacher.innerHTML='<option value="">Choose teacher...</option>'+uniqueTeachers.map(t=>`<option${t===cur?' selected':''}>${t}</option>`).join('');
+  }
+  document.getElementById('m-total').textContent=vw.length;
+  const ind=document.getElementById('storage-indicator');
+  if(ind){
+    const bytes=JSON.stringify(vw).length;
+    const kb=(bytes/1024).toFixed(1);
+    ind.textContent=vw.length+' walkthrough'+(vw.length!==1?'s':'')+' saved ('+kb+' KB)';
+  }
+  document.getElementById('m-teachers').textContent=new Set(vw.map(w=>tKey(w.teacher))).size;
+  const scored=vw.filter(w=>parseFloat(w.overallRating)>0);
+  document.getElementById('m-avg').textContent=scored.length?(scored.reduce((s,w)=>s+parseFloat(w.overallRating),0)/scored.length).toFixed(1):'—';
+  const lfc={};vw.forEach(w=>w.selectedData.forEach(d=>{lfc[d.title]=(lfc[d.title]||0)+1;}));
+  const top=Object.entries(lfc).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('m-top').textContent=top?top[0]:'—';
+
+  const barsTitleEl=document.getElementById('principal-bars-title');
+  if(isAdmin){
+    if(barsTitleEl)barsTitleEl.textContent='Walkthroughs by Principal';
+    const pCount={};principals.forEach(p=>pCount[p]=0);vw.forEach(w=>{if(pCount[w.principal]!==undefined)pCount[w.principal]++;});
+    const maxP=Math.max(...Object.values(pCount),1);
+    document.getElementById('principal-bars').innerHTML=principals.map((p,i)=>{const init=p.split(' ').map(n=>n[0]).join('').slice(0,2);const pct=Math.round(pCount[p]/maxP*100);return `<div class="p-row"><div class="p-av" style="background:${PC[i]};color:${PT[i]}">${init}</div><div style="flex:1"><div class="p-name">${p}</div><div class="p-sub">${pCount[p]} walkthrough${pCount[p]!==1?'s':''}</div></div><div class="p-bar-w"><div class="p-bar-bg"><div class="p-bar-f" style="width:${pct}%"></div></div></div><div class="p-cnt">${pCount[p]}</div></div>`;}).join('');
+  }else{
+    if(barsTitleEl)barsTitleEl.textContent='Observations by Teacher';
+    const tCount={};vw.forEach(w=>{tCount[w.teacher]=(tCount[w.teacher]||0)+1;});
+    const teacherNames=Object.keys(tCount).sort((a,b)=>tCount[b]-tCount[a]);
+    const maxT=Math.max(...Object.values(tCount),1);
+    document.getElementById('principal-bars').innerHTML=teacherNames.length?teacherNames.map((t,i)=>{const init=tInit(t);const pct=Math.round(tCount[t]/maxT*100);const ci=i%PC.length;return `<div class="p-row"><div class="p-av" style="background:${PC[ci]};color:${PT[ci]}">${init}</div><div style="flex:1"><div class="p-name">${t}</div><div class="p-sub">${tCount[t]} observation${tCount[t]!==1?'s':''}</div></div><div class="p-bar-w"><div class="p-bar-bg"><div class="p-bar-f" style="width:${pct}%"></div></div></div><div class="p-cnt">${tCount[t]}</div></div>`;}).join(''):'<div class="empty" style="padding:16px;">No data yet</div>';
+  }
+
+  const lfR={},lfC={};vw.forEach(w=>w.selectedData.forEach(d=>{if(!lfR[d.title]){lfR[d.title]=0;lfC[d.title]=0;}const sc=ratingByLabel(d.rating).score;if(sc>0){lfR[d.title]+=sc;lfC[d.title]++;}}));
+  const lfAvgs=Object.entries(lfR).map(([k,v])=>({name:k,avg:lfC[k]?v/lfC[k]:0})).sort((a,b)=>b.avg-a.avg);
+  document.getElementById('lookfor-bars').innerHTML=lfAvgs.length?lfAvgs.map(lf=>{const pct=Math.round((lf.avg-1)/3*100);const col=lf.avg>=3.5?'#0E7490':lf.avg>=2.5?'#0F766E':'#1D4ED8';return `<div class="bar-row"><div class="bar-lbl" title="${lf.name}">${lf.name}</div><div class="bar-track"><div class="bar-f" style="width:${pct}%;background:${col}"></div></div><div class="bar-pct">${lf.avg.toFixed(1)}</div></div>`;}).join(''):'<div class="empty" style="padding:16px;">No data yet</div>';
+
+  const tbody=document.getElementById('dash-tbody');
+  tbody.innerHTML=vw.length?vw.slice(0,10).map(w=>`<tr><td style="white-space:nowrap">${w.date}</td><td>${w.type==='Formal Observation'?'Formal':'Walkthrough'}</td><td>${w.principal}</td><td>${w.teacher}</td><td>${w.grade||'—'}</td><td><span class="badge ${badgeCls(w.overallRating)}">${w.overallRating}</span></td><td style="color:var(--text2);">${(w.feedbackText||'No written feedback').slice(0,80)}${(w.feedbackText||'').length>80?'...':''}</td></tr>`).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px;">No observations submitted yet</td></tr>';
+}
+// ============================================================
+//  TEACHER × MONTH OBSERVATION HEATMAP
+// ============================================================
+const HM_MONTH_COUNT=6; // trailing months shown on the heatmap
+function hmMonths(){
+  const months=[];
+  const now=new Date();
+  for(let i=HM_MONTH_COUNT-1;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    months.push({key:d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'),label:d.toLocaleDateString('en-US',{month:'short'}),year:d.getFullYear()});
+  }
+  return months;
+}
+function hmMonthKey(w){
+  const d=w.isoDate?new Date(w.isoDate):new Date(w.date);
+  if(isNaN(d))return null;
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function initHeatmapFilter(){
+  const sel=document.getElementById('heatmap-filter-p');
+  const wrap=document.getElementById('heatmap-filter-wrap');
+  if(!sel||!wrap)return;
+  const isAdmin=currentUser&&currentUser.admin;
+  wrap.style.display=isAdmin?'flex':'none';
+  if(isAdmin){
+    const cur=sel.value;
+    sel.innerHTML='<option value="">All principals</option>'+principals.map(p=>`<option${p===cur?' selected':''}>${p}</option>`).join('');
+  }
+}
+function renderHeatmap(){
+  const table=document.getElementById('heatmap-table');
+  if(!table)return;
+  initHeatmapFilter();
+  const isAdmin=currentUser&&currentUser.admin;
+  const titleEl=document.getElementById('heatmap-title');
+  const fp=isAdmin?(document.getElementById('heatmap-filter-p')?.value||''):'';
+  if(titleEl)titleEl.textContent=isAdmin?(fp?fp+'\u2019s Teachers \u2014 Observation Heatmap':'Teacher Observation Heatmap'):'Your Teachers \u2014 Observation Heatmap';
+
+  // Roster: which teachers appear as rows
+  let roster;
+  if(isAdmin)roster=fp?teachersFor(fp,false):teachers;
+  else roster=teachersFor(currentUser.name,false);
+  roster=[...roster].sort((a,b)=>a.localeCompare(b));
+
+  const months=hmMonths();
+  const vw=visibleWalkthroughs();
+
+  // counts[teacherKey][monthKey] = {count, sum, n}
+  const counts={};
+  vw.forEach(w=>{
+    if(fp&&w.principal!==fp)return;
+    const mk=hmMonthKey(w);
+    if(!mk)return;
+    const tk=tKey(w.teacher);
+    if(!counts[tk])counts[tk]={};
+    if(!counts[tk][mk])counts[tk][mk]={count:0,sum:0,n:0};
+    counts[tk][mk].count++;
+    const sc=parseFloat(w.overallRating);
+    if(!isNaN(sc)){counts[tk][mk].sum+=sc;counts[tk][mk].n++;}
+  });
+
+  if(!roster.length){table.innerHTML='<tr><td><div class="empty"><i class="ti ti-users"></i>No teachers to display.</div></td></tr>';return;}
+
+  let maxCount=1;
+  roster.forEach(t=>months.forEach(m=>{const c=counts[tKey(t)]?.[m.key]?.count||0;if(c>maxCount)maxCount=c;}));
+
+  const thead='<thead><tr><th class="hm-teacher-col">Teacher</th>'+months.map(m=>`<th>${m.label}</th>`).join('')+'</tr></thead>';
+  const tbody='<tbody>'+roster.map(t=>{
+    const tk=tKey(t);
+    const cells=months.map(m=>{
+      const cell=counts[tk]?.[m.key];
+      const count=cell?cell.count:0;
+      const lvl=count===0?0:count>=Math.ceil(maxCount*0.75)?4:count>=Math.ceil(maxCount*0.5)?3:count>=Math.ceil(maxCount*0.25)?2:1;
+      const avg=cell&&cell.n?(cell.sum/cell.n).toFixed(1):null;
+      const tip=`${t} \u2014 ${m.label}: ${count} observation${count!==1?'s':''}${avg?' \u00b7 avg '+avg:''}`;
+      return `<td><div class="hm-cell hm-${lvl}" title="${tip}" onclick="openHeatmapDetail('${t.replace(/'/g,"\\'")}','${m.key}','${m.label} ${m.year}')">${count||''}</div></td>`;
+    }).join('');
+    return `<tr><td class="hm-teacher-cell">${t}</td>${cells}</tr>`;
+  }).join('')+'</tbody>';
+  table.innerHTML=thead+tbody;
+}
+function openHeatmapDetail(teacherName,monthKey,monthLabel){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nt').forEach(t=>t.classList.remove('active'));
+  document.getElementById('view-heatmap-detail').classList.add('active');
+  document.getElementById('hmd-teacher').textContent=teacherName;
+  document.getElementById('hmd-month').textContent=monthLabel+' \u2014 observations';
+  document.getElementById('hmd-av').textContent=tInit(teacherName);
+  const list=visibleWalkthroughs().filter(w=>tKey(w.teacher)===tKey(teacherName)&&hmMonthKey(w)===monthKey)
+    .sort((a,b)=>new Date(b.isoDate||b.date)-new Date(a.isoDate||a.date));
+  const container=document.getElementById('hmd-list');
+  if(!list.length){container.innerHTML='<div class="empty"><i class="ti ti-clipboard-text"></i>No observations recorded for this teacher in this month.</div>';return;}
+  container.innerHTML='<div class="wt-list">'+list.map(w=>`<div class="wi">
+      <div class="wi-header">
+        <div><span class="wi-name">${w.type==='Formal Observation'?'Formal Observation':'Walkthrough'}</span>${w.grade?`<span style="font-size:11px;color:var(--text3);margin-left:8px;">${w.grade}</span>`:''}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;"><span class="badge ${badgeCls(w.overallRating)}">${w.overallRating}</span><span style="font-size:11px;color:var(--text3);">${w.date}${fmtTime(w.time)?' \u00b7 '+fmtTime(w.time):''}</span></div>
+      </div>
+      <div class="wi-meta">${w.principal}</div>
+      <div class="wi-tags">${w.selectedData.map(d=>`<span class="badge ${badgeCls(d.rating)}">${d.title}: ${d.rating}</span>`).join('')}</div>
+      ${w.fbHighlights?`<div class="wi-section"><div class="wi-section-label">Powerful Practices</div><div class="wi-fb">${w.fbHighlights}</div></div>`:''}
+      ${w.oppGrowth?`<div class="wi-section"><div class="wi-section-label">Opportunities for Growth</div><div class="wi-fb">${w.oppGrowth}</div></div>`:''}
+      ${w.fbReflection?`<div class="wi-section"><div class="wi-section-label">Reflections</div><div class="wi-fb">${w.fbReflection}</div></div>`:''}
+      ${!w.fbHighlights&&!w.fbReflection&&!w.oppGrowth?'<div style="font-size:12px;color:var(--text3);font-style:italic;margin-top:8px;">No written feedback recorded for this observation.</div>':''}
+      <div class="email-row">
+        ${(currentUser&&(currentUser.admin||currentUser.name===w.principal))?`<button class="btn btn-secondary btn-sm" onclick="editWT(${w.id})"><i class="ti ti-edit"></i> Edit</button>`:''}
+        ${w.type==='Formal Observation'?`<button class="btn btn-secondary btn-sm" onclick="printObservation(${w.id})"><i class="ti ti-printer"></i> Print</button>`:''}
+        <button class="btn btn-outlook btn-sm" onclick="openOutlook(${w.id})"><i class="ti ti-mail"></i> Open in Outlook</button>
+      </div>
+    </div>`).join('')+'</div>';
+}
+function closeHeatmapDetail(){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-dashboard').classList.add('active');
+  document.getElementById('tab-dashboard').classList.add('active');
+  renderHeatmap();
+}
+function exportXL(){
+  const exportData=visibleWalkthroughs();
+  if(!exportData.length){alert('No walkthrough data to export yet.');return;}
+  const wb=XLSX.utils.book_new();
+  const hdr=['Date','Type','Principal','Teacher','Email','Grade/Subject','Overall',...lookFors.map(l=>l.title),'Powerful Practices','Opportunities for Growth','Reflections','Follow-Up Notes'];
+  const rows=exportData.map(w=>{const lfCols=lookFors.map(lf=>{const d=w.selectedData.find(s=>s.title===lf.title);return d?d.rating:'—';});const notes=w.followUpNotes.map(n=>`[${n.date}] ${n.text}`).join(' | ');return [w.date,w.type||'Walkthrough',w.principal,w.teacher,w.email||'',w.grade||'',w.overallRating,...lfCols,w.fbHighlights||'',w.oppGrowth||'',w.fbReflection||'',notes];});
+  const ws=XLSX.utils.aoa_to_sheet([hdr,...rows]);ws['!cols']=[{wch:12},{wch:16},{wch:22},{wch:20},{wch:26},{wch:18},{wch:10},...lookFors.map(()=>({wch:10})),{wch:50},{wch:50},{wch:50},{wch:40}];
+  XLSX.utils.book_append_sheet(wb,ws,'Walkthroughs');
+  const isAdmin=currentUser&&currentUser.admin;
+  if(isAdmin){
+    const pHdr=['Principal','Walkthroughs','Teachers','Avg Rating'];
+    const pRows=principals.map(p=>{const pw=exportData.filter(w=>w.principal===p);const sc=pw.filter(w=>parseFloat(w.overallRating)>0);const avg=sc.length?sc.reduce((s,w)=>s+parseFloat(w.overallRating),0)/sc.length:0;return [p,pw.length,new Set(pw.map(w=>tKey(w.teacher))).size,avg>0?avg.toFixed(1):'—'];});
+    const ws2=XLSX.utils.aoa_to_sheet([pHdr,...pRows]);ws2['!cols']=[{wch:24},{wch:14},{wch:12},{wch:18}];
+    XLSX.utils.book_append_sheet(wb,ws2,'Principal Summary');
+  }
+  const lfHdr=['Look-For','Times Selected','Rated 1','Rated 2','Rated 3','Rated 4','Avg Score'];
+  const lfRows=lookFors.map(lf=>{const all=exportData.flatMap(w=>w.selectedData.filter(d=>d.title===lf.title));const c={'1':0,'2':0,'3':0,'4':0};all.forEach(d=>{if(c[d.rating]!==undefined)c[d.rating]++;});const sc=all.filter(d=>ratingByLabel(d.rating).score>0);return [lf.title,all.length,c['1'],c['2'],c['3'],c['4'],sc.length?(sc.reduce((s,d)=>s+ratingByLabel(d.rating).score,0)/sc.length).toFixed(2):'—'];});
+  const ws3=XLSX.utils.aoa_to_sheet([lfHdr,...lfRows]);ws3['!cols']=[{wch:28},{wch:14},{wch:14},{wch:12},{wch:12},{wch:18},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws3,'Look-For Analysis');
+  XLSX.writeFile(wb,`Classroom_Walkthroughs_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+function renderManage(){document.getElementById('lf-manage-list').innerHTML=lookFors.map(lf=>`<div class="lmi"><i class="ti ti-grip-vertical" style="color:var(--text3);font-size:18px;margin-top:2px;"></i><i class="ti ${lf.icon}" style="font-size:16px;color:var(--blue);margin-top:2px;"></i><div class="lmi-info"><div class="lmi-title">${lf.title}</div><div class="lmi-desc">${(lf.bullets||[]).join(' · ')}</div></div><div style="display:flex;gap:5px;flex-shrink:0;"><button class="btn-icon" onclick="startEdit('${lf.id}')"><i class="ti ti-edit"></i></button><button class="btn-icon danger" onclick="deleteLF('${lf.id}')"><i class="ti ti-trash"></i></button></div></div>`).join('');}
+function renderPEditor(){document.getElementById('principal-editor').innerHTML=`<div class="row2" style="margin-bottom:16px;">${principals.map((p,i)=>`<div class="fg"><label>Observer ${i+1}</label><input type="text" value="${p}" onchange="principals[${i}]=this.value;initDropdowns();saveSettings();"></div>`).join('')}</div>`;}
+function buildIconPicker(cid,current){document.getElementById(cid).innerHTML=ICONS.map(ic=>`<button class="io${ic===current?' sel':''}" title="${ic}" onclick="selIc('${ic}','${cid}')"><i class="ti ${ic}"></i></button>`).join('');}
+function selIc(ic,cid){document.querySelectorAll('#'+cid+' .io').forEach(b=>b.classList.toggle('sel',b.title===ic));if(cid==='icon-picker')selIcon=ic;else editSelIcon=ic;}
+function toggleAddF(){const f=document.getElementById('add-lf-form');f.style.display=f.style.display==='none'?'block':'none';document.getElementById('new-lf-title').value='';document.getElementById('new-lf-desc').value='';selIcon=ICONS[0];buildIconPicker('icon-picker',selIcon);}
+function addLF(){const title=document.getElementById('new-lf-title').value.trim();const desc=document.getElementById('new-lf-desc').value.trim();if(!title){alert('Please enter a title.');return;}const bullets=desc?desc.split('\n').map(s=>s.trim()).filter(Boolean):['Custom look-for'];lookFors.push({id:'lf_'+Date.now(),icon:selIcon,title,bullets});toggleAddF();renderManage();renderLFGrid();saveSettings();}
+function startEdit(id){editId=id;const lf=lookFors.find(l=>l.id===id);document.getElementById('edit-lf-title').value=lf.title;document.getElementById('edit-lf-desc').value=(lf.bullets||[]).join('\n');editSelIcon=lf.icon;document.getElementById('edit-lf-form').style.display='block';buildIconPicker('edit-icon-picker',editSelIcon);}
+function saveEdit(){const lf=lookFors.find(l=>l.id===editId);const title=document.getElementById('edit-lf-title').value.trim();if(!title){alert('Please enter a title.');return;}const desc=document.getElementById('edit-lf-desc').value.trim();lf.title=title;lf.bullets=desc?desc.split('\n').map(s=>s.trim()).filter(Boolean):lf.bullets;lf.icon=editSelIcon;cancelEdit();renderManage();renderLFGrid();saveSettings();}
+function cancelEdit(){document.getElementById('edit-lf-form').style.display='none';editId=null;}
+function deleteLF(id){if(!confirm('Remove this look-for?'))return;lookFors=lookFors.filter(l=>l.id!==id);delete formState.wt.selLF[id];delete formState.wt.ratings[id];delete formState.wt.lfComments[id];delete formState.fo.selLF[id];delete formState.fo.ratings[id];delete formState.fo.lfComments[id];renderManage();renderLFGrid();renderLFGridFor('fo');saveSettings();}
+
+let addTOpen=false;
+function toggleAddT(){addTOpen=!addTOpen;document.getElementById('add-t-form').style.display=addTOpen?'block':'none';if(addTOpen){document.getElementById('new-t-name').value='';document.getElementById('new-t-name').focus();}}
+function renderTeacherManage(){
+  document.getElementById('teacher-manage-list').innerHTML=teachers.map((t,i)=>{
+    const assigned=teacherAssignments[t]||[];
+    const chips=principals.map(p=>{
+      const checked=assigned.includes(p);
+      const init=p.split(' ').map(n=>n[0]).join('').slice(0,2);
+      return `<label title="${p}" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:100px;border:1px solid ${checked?'var(--blue)':'var(--border)'};background:${checked?'var(--blue-lt)':'#fff'};color:${checked?'var(--blue)':'var(--text3)'};cursor:pointer;user-select:none;"><input type="checkbox" ${checked?'checked':''} style="margin:0;width:12px;height:12px;" onchange="toggleTeacherAssignment('${t.replace(/'/g,"\\'")}','${p.replace(/'/g,"\\'")}',this.checked)">${init}</label>`;
+    }).join('');
+    return `<div class="lmi" style="align-items:flex-start;">
+      <i class="ti ti-grip-vertical" style="color:var(--text3);font-size:18px;margin-top:8px;"></i>
+      <i class="ti ti-user" style="font-size:16px;color:var(--blue);margin-top:8px;"></i>
+      <div class="lmi-info">
+        <input type="text" value="${t}" class="login-input" style="margin-bottom:6px;padding:6px 9px;" onchange="renameTeacher(${i},this.value)">
+        <div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;">
+          <span style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.03em;margin-right:2px;">Supervised by:</span>
+          ${chips}
+          ${!assigned.length?'<span style="font-size:11px;color:var(--text3);font-style:italic;">All principals (unassigned)</span>':''}
+        </div>
+      </div>
+      <div style="display:flex;gap:5px;flex-shrink:0;margin-top:8px;"><button class="btn-icon danger" onclick="deleteTeacher(${i})"><i class="ti ti-trash"></i></button></div>
+    </div>`;
+  }).join('');
+}
+function toggleTeacherAssignment(teacherName,principalName,checked){
+  if(!teacherAssignments[teacherName])teacherAssignments[teacherName]=[];
+  if(checked){
+    if(!teacherAssignments[teacherName].includes(principalName))teacherAssignments[teacherName].push(principalName);
+  }else{
+    teacherAssignments[teacherName]=teacherAssignments[teacherName].filter(p=>p!==principalName);
+  }
+  saveSettings();
+  initDropdowns();
+}
+function addTeacher(){
+  const input=document.getElementById('new-t-name');
+  const name=input.value.trim();
+  if(!name){alert('Please enter a teacher name.');return;}
+  if(teachers.includes(name)){alert('That teacher is already in the list.');return;}
+  teachers.push(name);
+  teachers.sort();
+  toggleAddT();
+  renderTeacherManage();
+  initDropdowns();
+  saveSettings();
+}
+function renameTeacher(i,newName){
+  newName=newName.trim();
+  if(!newName){renderTeacherManage();return;}
+  const oldName=teachers[i];
+  teachers[i]=newName;
+  if(oldName!==newName&&teacherAssignments[oldName]){
+    teacherAssignments[newName]=teacherAssignments[oldName];
+    delete teacherAssignments[oldName];
+  }
+  renderTeacherManage();
+  initDropdowns();
+  saveSettings();
+}
+function deleteTeacher(i){
+  if(!confirm('Remove '+teachers[i]+' from the teacher list? Existing walkthroughs for them will not be deleted.'))return;
+  const removedName=teachers[i];
+  teachers.splice(i,1);
+  delete teacherAssignments[removedName];
+  renderTeacherManage();
+  initDropdowns();
+  saveSettings();
+}
+
+async function syncSP(){
+  const btn=document.getElementById('btn-sync');
+  if(btn){btn.innerHTML='<i class="ti ti-loader"></i> Syncing...';btn.disabled=true;}
+  const ok=await loadFromSharePoint();
+  initDropdowns();renderLFGrid();renderLFGridFor('fo');
+  updateDash();renderFB();renderTeacherGrid();
+  if(btn){btn.innerHTML='<i class="ti ti-refresh"></i> Sync with Cloud';btn.disabled=false;}
+  const ind=document.getElementById('storage-indicator');
+  if(ind)ind.textContent=(ok?'✓ Synced with cloud · ':'⚠ Cloud unavailable — saved locally · ')+walkthroughs.length+' walkthroughs';
+}
+
+// ============================================================
+//  PERSISTENT STORAGE — data survives browser refresh
+// ============================================================
+function saveData(){
+  try{localStorage.setItem('walkthru_data', JSON.stringify(walkthroughs));}
+  catch(e){console.warn('Storage save failed:',e);}
+}
+function loadData(){
+  try{
+    const saved=localStorage.getItem('walkthru_data');
+    if(saved){
+      walkthroughs=JSON.parse(saved);
+      console.log('Loaded '+walkthroughs.length+' walkthroughs from storage');
+    }
+  }catch(e){console.warn('Storage load failed:',e);}
+}
+function saveSettings(){
+  try{localStorage.setItem('walkthru_settings', JSON.stringify({teachers,lookFors,principals,teacherAssignments}));}
+  catch(e){console.warn('Settings save failed:',e);}
+  saveSettingsToCloud();
+}
+function loadSettings(){
+  try{
+    const saved=localStorage.getItem('walkthru_settings');
+    if(saved){
+      const s=JSON.parse(saved);
+      if(s.teachers&&s.teachers.length)teachers=s.teachers;
+      if(s.lookFors&&s.lookFors.length)lookFors=s.lookFors;
+      if(s.principals&&s.principals.length)principals=s.principals;
+      if(s.teacherAssignments)teacherAssignments=s.teacherAssignments;
+    }
+  }catch(e){console.warn('Settings load failed:',e);}
+}
+function clearAllData(){
+  if(confirm('This will permanently delete ALL walkthrough data on this device. Are you sure?')){
+    localStorage.removeItem('walkthru_data');
+    walkthroughs=[];
+    updateDash();renderFB();renderTeacherGrid();
+    alert('All data cleared.');
+  }
+}
+
+const now=new Date(),pad=n=>String(n).padStart(2,'0');
+document.getElementById('obs-time').value=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+document.getElementById('obs-time-f').value=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+loadData();
+loadSettings();
+initDropdowns();
+initLoginScreen();
+renderLFGrid();
+renderLFGridFor('fo');
+updateDash();
+renderFB();
+// Check for existing session
+const savedSession=sessionStorage.getItem('wt_user');
+if(savedSession){
+  try{
+    currentUser=JSON.parse(savedSession);
+    applyLogin();
+  }catch(e){sessionStorage.removeItem('wt_user');}
+}
+// Sync with cloud after UI is ready
+setTimeout(()=>syncSP(),500);
+</script>
+</body>
+</html>
