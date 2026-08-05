@@ -176,7 +176,7 @@ tr:hover td{background:#fafcff;}
 .hm-1{background:#DBEAFE;color:#1D4ED8;}
 .hm-2{background:#93C5FD;color:#1E3A8A;}
 .hm-3{background:#3B82F6;color:#fff;}
-.hm-4{background:#185FA5;color:#fff;}
+.hm-4{background:#0047BA;color:#fff;}
 .hm-legend{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);margin-top:12px;}
 .hm-legend-box{width:14px;height:14px;border-radius:3px;}
 .empty i{font-size:36px;display:block;margin-bottom:10px;color:var(--border2);}
@@ -480,12 +480,22 @@ tr:hover td{background:#fafcff;}
   <div class="sec-label">Principals</div>
   <p style="font-size:12px;color:var(--text3);margin-bottom:12px;">Edit names to match your staff. Changes apply immediately.</p>
   <div id="principal-editor"></div>
+  <hr class="div">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+    <div><div class="sec-label" style="margin-bottom:3px;"><i class="ti ti-archive"></i> Year-End Data</div><div style="font-size:12px;color:var(--text3);">Export a full backup before starting a new school year, or view past years.</div></div>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+    <button class="btn btn-green btn-sm" onclick="exportAllYears()"><i class="ti ti-file-spreadsheet"></i> Export All Data (All Years)</button>
+    <button class="btn btn-primary btn-sm" onclick="archiveAndReset()"><i class="ti ti-calendar-plus"></i> Archive Year &amp; Start Fresh</button>
+  </div>
+  <div id="archive-status" style="font-size:12px;color:var(--text3);margin-top:4px;"></div>
+  <div id="past-years-section" style="margin-top:14px;"></div>
 </div>
 
 <script>
 const ICONS=['ti-target','ti-users','ti-message-question','ti-brain','ti-message-dots','ti-heart','ti-adjustments','ti-device-laptop','ti-book','ti-pencil','ti-star','ti-award','ti-bulb','ti-eye','ti-chart-line','ti-clock','ti-puzzle','ti-list-check','ti-school','ti-microphone','ti-presentation','ti-writing'];
-const PC=['#E6F1FB','#EAF3DE','#FAEEDA','#FBEAF0'];
-const PT=['#185FA5','#3B6D11','#854F0B','#993556'];
+const PC=['#E8F1FC','#EAF3DE','#FAEEDA','#FBEAF0'];
+const PT=['#0047BA','#3B6D11','#854F0B','#993556'];
 
 const RATINGS=[
   {key:'1', label:'1', cls:'sno',badgeCls:'bno',score:1},
@@ -901,7 +911,7 @@ function sv(n){
   document.querySelectorAll('.nt').forEach(t=>t.classList.remove('active'));
   document.getElementById('view-'+n).classList.add('active');
   document.getElementById('tab-'+n).classList.add('active');
-  if(n==='settings'){renderManage();renderTeacherManage();renderPEditor();}
+  if(n==='settings'){renderManage();renderTeacherManage();renderPEditor();renderPastYears();}
   if(n==='teachers'){document.getElementById('teacher-grid-view').style.display='block';document.getElementById('teacher-profile-view').style.display='none';renderTeacherGrid();}
   if(n==='feedback')renderFB();
   if(n==='dashboard'){updateDash();renderHeatmap();}
@@ -1648,6 +1658,149 @@ function closeHeatmapDetail(){
   document.getElementById('view-dashboard').classList.add('active');
   document.getElementById('tab-dashboard').classList.add('active');
   renderHeatmap();
+}
+// ============================================================
+//  YEAR-END ARCHIVE & MULTI-YEAR EXPORT
+//  Archives are stored in localStorage under 'walkthru_archive'
+//  and also pushed to Supabase as a special _archive record.
+// ============================================================
+function getArchives(){
+  try{const s=localStorage.getItem('walkthru_archive');return s?JSON.parse(s):[];}
+  catch(e){return [];}
+}
+function saveArchives(archives){
+  try{localStorage.setItem('walkthru_archive',JSON.stringify(archives));}
+  catch(e){console.warn('Archive save failed:',e);}
+}
+function archiveAndReset(){
+  if(!walkthroughs.length){alert('No walkthrough data to archive. Nothing to do.');return;}
+  const schoolYear=prompt('Name this school year (e.g. 2024-25):',guessSchoolYear());
+  if(!schoolYear)return;
+  if(!confirm(`This will:\n1. Save all current data as "${schoolYear}"\n2. Clear the current walkthroughs so you can start fresh\n\nSettings (teachers, look-fors, principals) are kept.\n\nContinue?`))return;
+  const archives=getArchives();
+  const existing=archives.find(a=>a.year===schoolYear);
+  if(existing){if(!confirm(`"${schoolYear}" already exists. Replace it?`))return;archives.splice(archives.indexOf(existing),1);}
+  archives.push({year:schoolYear,archivedAt:new Date().toISOString(),walkthroughs:[...walkthroughs]});
+  saveArchives(archives);
+  // Also push archive to Supabase if configured
+  saveArchiveToCloud(schoolYear,walkthroughs);
+  // Clear current data
+  walkthroughs=[];
+  saveData();
+  updateDash();renderFB();renderTeacherGrid();renderHeatmap();
+  document.getElementById('archive-status').textContent=`✓ Archived ${archives[archives.length-1].walkthroughs.length} walkthroughs as "${schoolYear}". Ready for a new year!`;
+  renderPastYears();
+}
+function guessSchoolYear(){
+  const now=new Date();
+  const y=now.getFullYear();
+  const m=now.getMonth()+1;
+  // School year: Sep–Jun, so if month >= 8 we're starting a new year
+  if(m>=8) return `${y}-${String(y+1).slice(2)}`;
+  return `${y-1}-${String(y).slice(2)}`;
+}
+async function saveArchiveToCloud(year,data){
+  if(!SB_URL||SB_URL.indexOf('YOUR_SUPABASE')===0)return;
+  try{
+    await fetch(`${SB_URL}/rest/v1/${SB_TABLE}`,{
+      method:'POST',
+      headers:{...sbHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({id:`_archive_${year}`,data:{__isArchive:true,year,archivedAt:new Date().toISOString(),walkthroughs:data}})
+    });
+  }catch(e){console.warn('Archive cloud save error:',e);}
+}
+function renderPastYears(){
+  const archives=getArchives();
+  const section=document.getElementById('past-years-section');
+  if(!section)return;
+  if(!archives.length){section.innerHTML='';return;}
+  section.innerHTML=`<div class="sec-label" style="margin-bottom:10px;font-size:11px;">Past School Years</div>`+
+    archives.slice().reverse().map(a=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg3);border-radius:var(--radius-lg);margin-bottom:8px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:120px;">
+          <div style="font-size:13px;font-weight:600;color:var(--text);">${a.year}</div>
+          <div style="font-size:11px;color:var(--text3);">${a.walkthroughs.length} walkthroughs · archived ${new Date(a.archivedAt).toLocaleDateString()}</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="exportYear('${a.year}')"><i class="ti ti-file-spreadsheet"></i> Export</button>
+        <button class="btn btn-secondary btn-sm" onclick="deleteArchive('${a.year}')"><i class="ti ti-trash"></i></button>
+      </div>`).join('');
+}
+function exportYear(year){
+  const archives=getArchives();
+  const archive=archives.find(a=>a.year===year);
+  if(!archive){alert('Archive not found.');return;}
+  exportToExcel(archive.walkthroughs,`Walkthroughs_${year}`);
+}
+function deleteArchive(year){
+  if(!confirm(`Permanently delete the "${year}" archive? This cannot be undone.`))return;
+  const archives=getArchives().filter(a=>a.year!==year);
+  saveArchives(archives);
+  renderPastYears();
+}
+function exportAllYears(){
+  const archives=getArchives();
+  const allData=[...walkthroughs,...archives.flatMap(a=>a.walkthroughs)];
+  if(!allData.length){alert('No data found across any year.');return;}
+  exportToExcel(allData,`Walkthroughs_All_Years`,archives);
+}
+function exportToExcel(data,filename,archives){
+  if(!data.length){alert('No data to export.');return;}
+  const wb=XLSX.utils.book_new();
+  // Main sheet
+  const hdr=['Year','Date','Type','Principal','Teacher','Email','Grade/Subject','Overall',...lookFors.map(l=>l.title),'Powerful Practices','Opportunities for Growth','Reflections'];
+  const rows=data.map(w=>{
+    const lfCols=lookFors.map(lf=>{const d=w.selectedData.find(s=>s.title===lf.title);return d?d.rating:'—';});
+    const year=w.schoolYear||guessSchoolYearForDate(w.date||w.isoDate);
+    return [year,w.date,w.type||'Walkthrough',w.principal,w.teacher,w.email||'',w.grade||'',w.overallRating,...lfCols,w.fbHighlights||'',w.oppGrowth||'',w.fbReflection||''];
+  });
+  const ws=XLSX.utils.aoa_to_sheet([hdr,...rows]);
+  ws['!cols']=[{wch:10},{wch:12},{wch:16},{wch:22},{wch:20},{wch:26},{wch:18},{wch:10},...lookFors.map(()=>({wch:10})),{wch:50},{wch:50},{wch:50}];
+  XLSX.utils.book_append_sheet(wb,ws,'All Walkthroughs');
+  // Year summary sheet
+  if(archives&&archives.length){
+    const years=[{year:'Current',walkthroughs},...archives];
+    const yHdr=['Year','Walkthroughs','Teachers Observed','Principals Active','Avg Rating'];
+    const yRows=years.map(a=>{
+      const wts=a.walkthroughs;
+      const sc=wts.filter(w=>parseFloat(w.overallRating)>0);
+      const avg=sc.length?(sc.reduce((s,w)=>s+parseFloat(w.overallRating),0)/sc.length).toFixed(1):'—';
+      return [a.year,wts.length,new Set(wts.map(w=>tKey(w.teacher))).size,new Set(wts.map(w=>w.principal).filter(Boolean)).size,avg];
+    });
+    const ws4=XLSX.utils.aoa_to_sheet([yHdr,...yRows]);
+    ws4['!cols']=[{wch:12},{wch:14},{wch:18},{wch:18},{wch:12}];
+    XLSX.utils.book_append_sheet(wb,ws4,'Year Summary');
+  }
+  // Principal summary
+  const pHdr=['Year','Principal','Walkthroughs','Teachers','Avg Rating'];
+  const pRows=[];
+  const allYears=[{year:guessSchoolYear(),walkthroughs},...(archives||[])];
+  allYears.forEach(a=>{
+    principals.forEach(p=>{
+      const pw=a.walkthroughs.filter(w=>w.principal===p);
+      if(!pw.length)return;
+      const sc=pw.filter(w=>parseFloat(w.overallRating)>0);
+      const avg=sc.length?(sc.reduce((s,w)=>s+parseFloat(w.overallRating),0)/sc.length).toFixed(1):'—';
+      pRows.push([a.year,p,pw.length,new Set(pw.map(w=>tKey(w.teacher))).size,avg]);
+    });
+  });
+  if(pRows.length){
+    const ws2=XLSX.utils.aoa_to_sheet([pHdr,...pRows]);
+    ws2['!cols']=[{wch:12},{wch:24},{wch:14},{wch:12},{wch:12}];
+    XLSX.utils.book_append_sheet(wb,ws2,'By Principal');
+  }
+  // Look-For analysis
+  const lfHdr=['Look-For','Times Selected','Rated 1','Rated 2','Rated 3','Rated 4','Avg Score'];
+  const lfRows=lookFors.map(lf=>{const all=data.flatMap(w=>w.selectedData.filter(d=>d.title===lf.title));const c={'1':0,'2':0,'3':0,'4':0};all.forEach(d=>{if(c[d.rating]!==undefined)c[d.rating]++;});const sc=all.filter(d=>ratingByLabel(d.rating).score>0);return [lf.title,all.length,c['1'],c['2'],c['3'],c['4'],sc.length?(sc.reduce((s,d)=>s+ratingByLabel(d.rating).score,0)/sc.length).toFixed(2):'—'];});
+  const ws3=XLSX.utils.aoa_to_sheet([lfHdr,...lfRows]);ws3['!cols']=[{wch:28},{wch:14},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws3,'Look-For Analysis');
+  XLSX.writeFile(wb,`${filename}_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+function guessSchoolYearForDate(dateStr){
+  if(!dateStr)return guessSchoolYear();
+  const d=new Date(dateStr);
+  if(isNaN(d))return guessSchoolYear();
+  const y=d.getFullYear(),m=d.getMonth()+1;
+  return m>=8?`${y}-${String(y+1).slice(2)}`:`${y-1}-${String(y).slice(2)}`;
 }
 function exportXL(){
   const exportData=visibleWalkthroughs();
