@@ -1,0 +1,13 @@
+# Netlify configuration
+# Prevents browsers and CDN from caching the HTML file,
+# so every deploy is picked up immediately by all browsers.
+
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
