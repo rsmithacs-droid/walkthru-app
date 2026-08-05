@@ -611,7 +611,9 @@ tr:hover td{background:#fafcff;}
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
     <button class="btn btn-green btn-sm" onclick="exportAllYears()"><i class="ti ti-file-spreadsheet"></i> Export All Data (All Years)</button>
     <button class="btn btn-primary btn-sm" onclick="archiveAndReset()"><i class="ti ti-calendar-plus"></i> Archive Year &amp; Start Fresh</button>
+    <button class="btn btn-secondary btn-sm" onclick="forcePushSettings()"><i class="ti ti-cloud-upload"></i> Push Settings to Cloud</button>
   </div>
+  <div id="push-settings-status" style="font-size:12px;color:var(--text3);margin-top:4px;"></div>
   <div id="archive-status" style="font-size:12px;color:var(--text3);margin-top:4px;"></div>
   <div id="past-years-section" style="margin-top:14px;"></div>
   <hr class="div">
@@ -1873,6 +1875,14 @@ function archiveAndReset(){
   updateDash();renderFB();renderTeacherGrid();renderHeatmap();
   document.getElementById('archive-status').textContent=`✓ Archived ${archives[archives.length-1].walkthroughs.length} walkthroughs as "${schoolYear}". Ready for a new year!`;
   renderPastYears();
+}
+async function forcePushSettings(){
+  const el=document.getElementById('push-settings-status');
+  if(el)el.textContent='Pushing to cloud...';
+  const ok1=await saveSettingsToCloud();
+  const ok2=await savePsSettingsToCloud();
+  if(el)el.textContent=(ok1&&ok2)?'✓ All settings pushed to cloud — other browsers will sync on next load.':'⚠ Push failed — check that Supabase is online at supabase.com';
+  setTimeout(()=>{if(el)el.textContent='';},5000);
 }
 function guessSchoolYear(){
   const now=new Date();
