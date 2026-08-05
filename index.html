@@ -488,7 +488,11 @@ tr:hover td{background:#fafcff;}
   </div>
   <div id="archive-status" style="font-size:12px;color:var(--text3);margin-top:4px;"></div>
   <div id="past-years-section" style="margin-top:14px;"></div>
-</div>
+  <hr class="div">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+    <div><div class="sec-label" style="margin-bottom:3px;color:#c0392b;"><i class="ti ti-alert-triangle"></i> Danger Zone</div><div style="font-size:12px;color:var(--text3);">Permanently deletes all observations from this device and the cloud. Settings are kept.</div></div>
+  </div>
+  <button id="btn-clear-data" class="btn btn-sm" style="background:#c0392b;color:#fff;" onclick="clearAllData()"><i class="ti ti-trash"></i> Reset All Observation Data</button>
 
 <script>
 const ICONS=['ti-target','ti-users','ti-message-question','ti-brain','ti-message-dots','ti-heart','ti-adjustments','ti-device-laptop','ti-book','ti-pencil','ti-star','ti-award','ti-bulb','ti-eye','ti-chart-line','ti-clock','ti-puzzle','ti-list-check','ti-school','ti-microphone','ti-presentation','ti-writing'];
@@ -1990,13 +1994,45 @@ function loadSettings(){
     }
   }catch(e){console.warn('Settings load failed:',e);}
 }
-function clearAllData(){
-  if(confirm('This will permanently delete ALL walkthrough data on this device. Are you sure?')){
-    localStorage.removeItem('walkthru_data');
-    walkthroughs=[];
-    updateDash();renderFB();renderTeacherGrid();
-    alert('All data cleared.');
+async function clearAllData(){
+  if(!confirm('This will permanently delete ALL walkthrough and observation data — both on this device and in the cloud.\n\nYour teachers, look-fors, and principal settings will be kept.\n\nAre you sure?'))return;
+  if(!confirm('Second confirmation: this cannot be undone. Delete all observations?'))return;
+
+  // 1. Clear localStorage
+  localStorage.removeItem('walkthru_data');
+  walkthroughs=[];
+
+  // 2. Clear Supabase — delete every row that is NOT the settings record
+  const btn=document.getElementById('btn-clear-data');
+  if(btn){btn.innerHTML='<i class="ti ti-loader"></i> Clearing cloud...';btn.disabled=true;}
+  let cloudOk=false;
+  if(SB_URL&&SB_URL.indexOf('YOUR_SUPABASE')!==0){
+    try{
+      // Fetch all IDs first, then delete non-settings rows
+      const r=await fetch(`${SB_URL}/rest/v1/${SB_TABLE}?select=id`,{headers:sbReadHeaders()});
+      if(r.ok){
+        const rows=await r.json();
+        const ids=rows.map(x=>x.id).filter(id=>!String(id).startsWith('_settings')&&!String(id).startsWith('_archive'));
+        // Delete in one call using id=in.(id1,id2,...)
+        if(ids.length){
+          const inList=ids.map(id=>encodeURIComponent(id)).join(',');
+          const dr=await fetch(`${SB_URL}/rest/v1/${SB_TABLE}?id=in.(${ids.map(i=>`"${i}"`).join(',')})`,{
+            method:'DELETE',headers:sbHeaders()
+          });
+          cloudOk=dr.ok||dr.status===204;
+        } else {
+          cloudOk=true; // nothing to delete
+        }
+      }
+    }catch(e){console.warn('Cloud clear error:',e);}
   }
+
+  // 3. Refresh all views
+  updateDash();renderFB();renderTeacherGrid();renderHeatmap();
+  if(btn){btn.innerHTML='<i class="ti ti-trash"></i> Reset All Observation Data';btn.disabled=false;}
+  alert(cloudOk
+    ?'✓ All observation data cleared from this device and the cloud. Ready for a fresh start!'
+    :'All observation data cleared from this device. Cloud may still have old data — press Sync to confirm.');
 }
 
 const now=new Date(),pad=n=>String(n).padStart(2,'0');
