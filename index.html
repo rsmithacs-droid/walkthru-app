@@ -995,7 +995,8 @@ async function loadFromSharePoint(){
       if(settingsRow.principals&&settingsRow.principals.length)principals=settingsRow.principals;
       if(settingsRow.teacherAssignments)teacherAssignments=settingsRow.teacherAssignments;
       if(settingsRow.users&&settingsRow.users.length)users=settingsRow.users;
-      saveSettings();
+      // Update localStorage silently — don't let a write failure block the sync
+      try{localStorage.setItem('walkthru_settings',JSON.stringify({teachers,lookFors,principals,teacherAssignments,users}));}catch(e){}
     }
     // Also load preschool settings from the _ps_settings record
     const psSettingsRow=all.find(d=>d&&d.__isPsSettings);
@@ -1003,30 +1004,29 @@ async function loadFromSharePoint(){
       if(psSettingsRow.psLookFors&&psSettingsRow.psLookFors.length)psLookFors=psSettingsRow.psLookFors;
       if(psSettingsRow.psTeachers)psTeachers=psSettingsRow.psTeachers;
       if(psSettingsRow.psPrincipals&&psSettingsRow.psPrincipals.length)psPrincipals=psSettingsRow.psPrincipals;
-      savePsSettings();
+      try{localStorage.setItem('walkthru_ps_settings',JSON.stringify({psLookFors,psTeachers,psPrincipals}));}catch(e){}
     }
     // Load preschool observations separately
     const psSbWTs=all.filter(d=>d&&d.__isPreschool);
     if(psSbWTs.length){
       const psLocalOnly=psWalkthroughs.filter(w=>w.synced!==true&&!psSbWTs.find(s=>String(s.id)===String(w.id)));
       psWalkthroughs=[...psLocalOnly,...psSbWTs];
-      savePsData();
+      try{localStorage.setItem('walkthru_ps_data',JSON.stringify(psWalkthroughs));}catch(e){}
     } else if(all.some(d=>d&&d.__isPsSettings)){
-      // _ps_settings exists but no ps observations — treat as authoritative empty
-      psWalkthroughs=[];savePsData();
+      psWalkthroughs=[];
+      try{localStorage.setItem('walkthru_ps_data','[]');}catch(e){}
     }
     const sbWTs=all.filter(d=>d&&!d.__isSettings&&!d.__isArchive&&!d.__isPreschool&&!d.__isPsSettings);
     // If Supabase has zero observations, treat that as authoritative (handles admin resets).
     // This ensures a reset by the CAO propagates to every principal on their next sync.
     if(sbWTs.length===0){
       walkthroughs=[];
-      saveData();
+      try{localStorage.setItem('walkthru_data','[]');}catch(e){}
       return true;
     }
-    // Otherwise keep any local-only items not yet synced, merge with server data
     const localOnly=walkthroughs.filter(w=>w.synced!==true&&!sbWTs.find(s=>String(s.id)===String(w.id)));
     walkthroughs=[...localOnly,...sbWTs];
-    saveData();
+    try{localStorage.setItem('walkthru_data',JSON.stringify(walkthroughs));}catch(e){}
     return true;
   }catch(e){console.warn('Supabase load error:',e);return false;}
 }
