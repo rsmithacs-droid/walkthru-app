@@ -230,7 +230,9 @@ tr:hover td{background:#fafcff;}
     <button class="nt" onclick="sv('feedback')" id="tab-feedback"><i class="ti ti-message-dots"></i> Feedback</button>
     <button class="nt" onclick="sv('teachers')" id="tab-teachers"><i class="ti ti-users"></i> Teachers</button>
     <button class="nt" onclick="sv('dashboard')" id="tab-dashboard"><i class="ti ti-chart-bar"></i> <span id="tab-dashboard-label">CAO Dashboard</span></button>
+    <button class="nt" id="tab-preschool" onclick="sv('preschool')" style="display:none;"><i class="ti ti-building-community"></i> Preschool</button>
     <button class="nt" id="tab-settings" onclick="sv('settings')"><i class="ti ti-settings"></i> Settings</button>
+    <button class="nt" id="tab-ps-settings" onclick="sv('ps-settings')" style="display:none;"><i class="ti ti-settings-2"></i> PS Settings</button>
   </div>
   <button class="user-pill" id="user-pill" onclick="doLogout()" style="display:none;"><i class="ti ti-user"></i> <span id="user-pill-name"></span> <i class="ti ti-logout" style="font-size:12px;margin-left:2px;"></i></button>
 </nav>
@@ -424,6 +426,110 @@ tr:hover td{background:#fafcff;}
   </div>
 </div>
 
+<!-- PRESCHOOL WALKTHROUGH -->
+<div class="view" id="view-preschool">
+  <div class="card">
+    <div id="ps-edit-banner" style="display:none;background:var(--blue-lt);border:1px solid #b0c8e8;border-radius:var(--radius-lg);padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--text);align-items:center;justify-content:space-between;">
+      <span><i class="ti ti-edit" style="vertical-align:-2px;margin-right:6px;"></i>Editing an existing observation</span>
+      <button class="btn btn-secondary btn-sm" onclick="cancelPsEdit()">Cancel Edit</button>
+    </div>
+    <div class="sec-label">Observation Details</div>
+    <div class="row2">
+      <div class="fg"><label>Observer</label><select id="ps-observer"><option value="">Select observer...</option></select></div>
+      <div class="fg"><label>Teacher</label><select id="ps-teacher-name"><option value="">Select teacher...</option></select></div>
+    </div>
+    <div class="row2">
+      <div class="fg"><label>Room / Group</label><input type="text" id="ps-grade" placeholder="e.g. Room 3, AM Class"></div>
+      <div class="fg"><label>Date &amp; Time</label><input type="datetime-local" id="ps-obs-time"></div>
+    </div>
+    <hr class="div">
+    <div class="fg" style="margin-bottom:14px;">
+      <label style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Observation Notes <span style="font-weight:400;color:var(--text3);">— script or context notes (optional)</span></span>
+        <button type="button" class="mic-btn" id="ps-mic-btn" onclick="toggleDictation('ps-obs-notes','ps-mic-btn')"><i class="ti ti-microphone"></i> <span>Dictate</span></button>
+      </label>
+      <textarea id="ps-obs-notes" rows="3" placeholder="Script key moments, quotes, or context from the observation..."></textarea>
+    </div>
+    <hr class="div">
+    <div class="sec-label">Look-Fors — Click a card to include it, then select a rating</div>
+    <div class="rating-key">
+      <span class="rk-item"><span class="rk-pill bno">1</span></span>
+      <span class="rk-item"><span class="rk-pill b1">2</span></span>
+      <span class="rk-item"><span class="rk-pill b2">3</span></span>
+      <span class="rk-item"><span class="rk-pill b3">4</span></span>
+    </div>
+    <div class="lf-grid" id="ps-lf-grid"></div>
+    <hr class="div">
+    <div style="margin-bottom:0;">
+      <div class="fg" style="margin-bottom:12px;">
+        <label>Powerful Practices</label>
+        <textarea id="ps-fb-highlights" rows="3" placeholder="Powerful practices from the observation..."></textarea>
+      </div>
+      <div class="fg" style="margin-bottom:12px;">
+        <label>Opportunities for Growth</label>
+        <textarea id="ps-opp-growth" rows="3" placeholder="Areas for growth..."></textarea>
+      </div>
+      <div class="fg" style="margin-bottom:0;">
+        <label>Reflections</label>
+        <textarea id="ps-fb-reflection" rows="3" placeholder="Reflections for the teacher to consider..."></textarea>
+      </div>
+    </div>
+    <div style="margin-bottom:12px;">
+      <button class="btn btn-secondary" id="ps-btn-ai-draft" onclick="aiDraftPsFeedback()"><i class="ti ti-sparkles"></i> Draft Feedback with AI</button>
+      <span id="ps-ai-draft-status" style="font-size:12px;color:var(--text3);margin-left:10px;display:none;"></span>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" id="ps-btn-save" onclick="submitPsWT()"><i class="ti ti-device-floppy"></i> Save Observation</button>
+      <button class="btn btn-secondary" onclick="clearPsForm()">Clear Form</button>
+    </div>
+    <div id="ps-success-banner" style="display:none;"></div>
+  </div>
+  <div class="card" style="margin-top:0;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+      <div class="filter-row" style="margin-bottom:0;">
+        <label>Filter:</label>
+        <select id="ps-filter-p" onchange="renderPsFeedback()"><option value="">All observers</option></select>
+      </div>
+      <button class="btn btn-green btn-sm" onclick="exportPsXL()"><i class="ti ti-file-spreadsheet"></i> Export</button>
+    </div>
+    <div id="ps-feedback-list"><div class="empty"><i class="ti ti-clipboard-text"></i> No preschool observations yet.</div></div>
+  </div>
+</div>
+
+<!-- PRESCHOOL SETTINGS -->
+<div class="view" id="view-ps-settings">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div><div class="sec-label" style="margin-bottom:3px;">Preschool Look-Fors</div><div style="font-size:12px;color:var(--text3);">Manage look-fors for preschool observations.</div></div>
+    <button class="btn btn-primary btn-sm" onclick="togglePsAddF()"><i class="ti ti-plus"></i> Add Look-For</button>
+  </div>
+  <div id="ps-add-lf-form" style="display:none;" class="add-form">
+    <h4>New Look-For</h4>
+    <div class="row2" style="margin-bottom:10px;">
+      <div class="fg"><label>Title</label><input type="text" id="ps-new-lf-title" placeholder="e.g. Learning Clarity"></div>
+      <div class="fg"><label>Indicators (one per line)</label><textarea id="ps-new-lf-desc" rows="3" placeholder="Indicator one.&#10;Indicator two."></textarea></div>
+    </div>
+    <div style="display:flex;gap:8px;"><button class="btn btn-primary btn-sm" onclick="addPsLF()"><i class="ti ti-check"></i> Add</button><button class="btn btn-secondary btn-sm" onclick="togglePsAddF()">Cancel</button></div>
+  </div>
+  <div class="lm-list" id="ps-lf-manage-list"></div>
+  <hr class="div">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div><div class="sec-label" style="margin-bottom:3px;">Preschool Teachers</div><div style="font-size:12px;color:var(--text3);">Teachers who appear in the preschool observation form.</div></div>
+    <button class="btn btn-primary btn-sm" onclick="togglePsAddT()"><i class="ti ti-plus"></i> Add Teacher</button>
+  </div>
+  <div id="ps-add-t-form" style="display:none;" class="add-form">
+    <h4>New Preschool Teacher</h4>
+    <div class="fg" style="margin-bottom:10px;"><label>Name</label><input type="text" id="ps-new-t-name" placeholder="e.g. Johnson" onkeydown="if(event.key==='Enter')addPsTeacher()"></div>
+    <div style="display:flex;gap:8px;"><button class="btn btn-primary btn-sm" onclick="addPsTeacher()"><i class="ti ti-check"></i> Add</button><button class="btn btn-secondary btn-sm" onclick="togglePsAddT()">Cancel</button></div>
+  </div>
+  <div class="lm-list" id="ps-teacher-manage-list"></div>
+  <hr class="div">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div><div class="sec-label" style="margin-bottom:3px;">Preschool Observers &amp; Accounts</div><div style="font-size:12px;color:var(--text3);">Add login accounts for preschool observers. They'll see only the Preschool tab.</div></div>
+    <button class="btn btn-primary btn-sm" onclick="addPsObserver()"><i class="ti ti-plus"></i> Add Observer</button>
+  </div>
+  <div class="lm-list" id="ps-observer-manage-list"></div>
+</div>
+
 <!-- HEATMAP DRILL-DOWN -->
 <div class="view" id="view-heatmap-detail">
   <button class="btn btn-secondary btn-sm" style="margin-bottom:16px;" onclick="closeHeatmapDetail()"><i class="ti ti-arrow-left"></i> Back to Dashboard</button>
@@ -538,6 +644,7 @@ let users = [
   {name:'Jordana Halkett', email:'jordana.halkett@bellevuechristian.org',     password:'jordana',  admin:false},
   {name:'Mike Olson',      email:'mike.olson@bellevuechristian.org',          password:'mike',     admin:false},
   {name:'Stephanie Andreotti',email:'stephanie.andreotti@bellevuechristian.org',password:'stephanie',admin:false},
+  {name:'Preschool Director',email:'preschool@bellevuechristian.org',         password:'preschool',admin:false,preschool:true},
 ];
 
 let currentUser = null;
@@ -568,6 +675,8 @@ function doLogout(){
   document.getElementById('user-pill').style.display='none';
   // Hide settings tab for all on logout
   document.getElementById('tab-settings').style.display='';
+  document.getElementById('tab-preschool').style.display='none';
+  document.getElementById('tab-ps-settings').style.display='none';
 }
 
 function applyLogin(){
@@ -576,6 +685,10 @@ function applyLogin(){
   document.getElementById('user-pill-name').textContent=currentUser.name;
   // Non-admins: hide Look-Fors settings tab
   document.getElementById('tab-settings').style.display=currentUser.admin?'':'none';
+  // Preschool tab: show for admin or users flagged as preschool
+  const showPS=currentUser.admin||currentUser.preschool;
+  document.getElementById('tab-preschool').style.display=showPS?'':'none';
+  document.getElementById('tab-ps-settings').style.display=currentUser.admin?'':'none';
   // Relabel the dashboard tab: admin sees the full CAO Dashboard, principals see their own
   document.getElementById('tab-dashboard-label').textContent=currentUser.admin?'CAO Dashboard':'My Dashboard';
   // Refresh teacher dropdowns now that we know who's logged in (filters by assignment)
@@ -921,6 +1034,26 @@ let lookFors=[
 ];
 
 let principals=['Corrine Nield','Jayna Harris','Jordana Halkett','Mike Olson','Rebecca Smith','Stephanie Andreotti'];
+
+// ============================================================
+//  PRESCHOOL DATA — stored separately from K-12
+// ============================================================
+let psLookFors=[
+  {id:'ps_lc',icon:'ti-target',title:'Learning Clarity',
+   bullets:['Routines/Procedures','Instructional clarity (circle time, social-emotional coaching, etc.)','Directions clear','Expectations clear']},
+  {id:'ps_cc',icon:'ti-heart',title:'Classroom Culture',
+   bullets:['Student: Teacher relationship – safety, trust','Teacher: Assistant relationship – collaboration, communication','Student: Student relationship – kindness, respect, friendships, conflict resolution']},
+  {id:'ps_se',icon:'ti-users',title:'Student Engagement',
+   bullets:['Clear, Delineated Centers – sensory, dramatic play, fine motor, creation station, math, science, library, blocks, large toy play, light table, magnet board','Colorful & inviting learning options','Initial set up sparks student ideas','Things to touch & explore','Open-ended','Collaborative opportunities','Variety (e.g. table activities rotate almost daily & centers rotate monthly)','Student independence encouraged','Student interest visible (e.g. length of time lingering at a center)','Mixture of process art & product art','Mixture of teacher designed/teacher involvement & student designed/student independent activities']},
+  {id:'ps_at',icon:'ti-brain',title:'Academic Thinking',
+   bullets:['Intentional infusion of learning targets','Purposeful arrangement','Focus on process','Intentionally utilizes learning tools & curriculums (e.g. tweezers, dice, HWT materials, ABC tubs, etc.)','Direct teaching of concepts & skills','Words, pictures & books on display in multiple centers','Build up expectations/level of difficulty throughout the year','Inclusion of target tables','Cyclical teaching – not one and done','Every moment is a teachable moment']},
+  {id:'ps_bw',icon:'ti-book',title:'Biblical Worldview Shaping',
+   bullets:['Modeling Christian character in words & actions to staff and students','Coaching students about Christian character – fruit of the Spirit, conflict restoration','Intentional teaching of God\'s story','Emphasis on prayer','Infusion of worship','Highlighting God\'s character during discussions of topics of study & throughout the day']},
+];
+let psTeachers=[];
+let psPrincipals=['Rebecca Smith'];
+let psWalkthroughs=[];
+const psFormState={selLF:{},ratings:{},lfComments:{}};
 let teachers=['Ahnert','Barfield','Bengelink','Bennett','Cairns','Cannon','Carpenter','Clark','Cobbley','Cortwright','Cotton','Crawford','Crowe','Curran','Daly','DeFreece','Doyle','Durst','Edwards','Eichholz','Fudge','Gallion','Gershon','Gill','Grishko','Hanson','Hart','Hatate','Henry','Hogan','Hunt','Jensen','Kelly','Kim','Kimball','Kinman','Lin','McGowan','McMurray','Nieto','Pavao','Pelone','Peterson','Pridmore','Riss','Schmer','Shepherd','Sonheim','Sorensen','Stanton','Taleno','Teng','Washington','Wasserman','Wicks','Wishart','Young'];
 // Maps teacher name -> array of principal names who supervise them.
 // A teacher with no entry here (or an empty array) is visible to ALL principals by default,
@@ -942,6 +1075,8 @@ function sv(n){
   document.getElementById('view-'+n).classList.add('active');
   document.getElementById('tab-'+n).classList.add('active');
   if(n==='settings'){renderManage();renderTeacherManage();renderPEditor();renderUserManage();renderPastYears();}
+  if(n==='preschool'){renderPsLFGrid();renderPsFeedback();initPsDropdowns();}
+  if(n==='ps-settings'){renderPsManage();renderPsTeacherManage();renderPsObserverManage();}
   if(n==='teachers'){document.getElementById('teacher-grid-view').style.display='block';document.getElementById('teacher-profile-view').style.display='none';renderTeacherGrid();}
   if(n==='feedback')renderFB();
   if(n==='dashboard'){updateDash();renderHeatmap();}
@@ -1832,6 +1967,341 @@ function guessSchoolYearForDate(dateStr){
   const y=d.getFullYear(),m=d.getMonth()+1;
   return m>=8?`${y}-${String(y+1).slice(2)}`:`${y-1}-${String(y).slice(2)}`;
 }
+// ============================================================
+//  PRESCHOOL FUNCTIONS  (mirrors K-12 pattern exactly)
+// ============================================================
+let psEditingId=null;
+
+function initPsDropdowns(){
+  const obs=document.getElementById('ps-observer');
+  const tn=document.getElementById('ps-teacher-name');
+  const fp=document.getElementById('ps-filter-p');
+  if(obs){
+    const cur=obs.value;
+    obs.innerHTML='<option value="">Select observer...</option>'+psPrincipals.map(p=>`<option${p===cur?' selected':''}>${p}</option>`).join('');
+    if(currentUser&&!currentUser.admin)[...obs.options].forEach(o=>{if(o.value===currentUser.name)o.selected=true;});
+    obs.disabled=!!(currentUser&&!currentUser.admin);
+  }
+  if(tn){
+    const cur=tn.value;
+    tn.innerHTML='<option value="">Select teacher...</option>'+psTeachers.map(t=>`<option${t===cur?' selected':''}>${t}</option>`).join('');
+  }
+  if(fp){
+    const cur=fp.value;
+    fp.innerHTML='<option value="">All observers</option>'+psPrincipals.map(p=>`<option${p===cur?' selected':''}>${p}</option>`).join('');
+  }
+}
+
+function renderPsLFGrid(){
+  const grid=document.getElementById('ps-lf-grid');
+  if(!grid)return;
+  grid.innerHTML=psLookFors.map(lf=>{
+    const btns=RATINGS.map(r=>`<button class="rb${psFormState.ratings[lf.id]===r.label?' '+r.cls:''}" onclick="setPsRating('${lf.id}','${r.label}','${r.cls}',this)">${r.key}</button>`).join('');
+    const cmt=psFormState.lfComments[lf.id]||'';
+    return `<div class="lfc${psFormState.selLF[lf.id]?' selected':''}" id="ps-lfc-${lf.id}" onclick="if(event.target.classList.contains('rb')||event.target.classList.contains('lf-comment'))return;togglePsLF('${lf.id}')">
+      <div class="lf-head"><i class="ti ${lf.icon} lf-icon"></i><span class="lf-title">${lf.title}</span></div>
+      ${bulletsHtml(lf.bullets)}
+      <div class="rr">${btns}</div>
+      <textarea class="lf-comment${cmt?' has-text':''}" placeholder="Add a comment (optional)..." onclick="event.stopPropagation()" oninput="psFormState.lfComments['${lf.id}']=this.value;this.classList.toggle('has-text',this.value.length>0)">${cmt}</textarea>
+    </div>`;
+  }).join('');
+}
+
+function togglePsLF(id){
+  if(psFormState.selLF[id]){delete psFormState.selLF[id];delete psFormState.ratings[id];delete psFormState.lfComments[id];}
+  else{psFormState.selLF[id]=true;}
+  renderPsLFGrid();
+}
+function setPsRating(id,label,cls,btn){
+  psFormState.selLF[id]=true;psFormState.ratings[id]=label;
+  btn.closest('.rr').querySelectorAll('.rb').forEach(b=>b.className='rb');
+  btn.className='rb '+cls;
+  const card=document.getElementById('ps-lfc-'+id);
+  if(card)card.classList.add('selected');
+}
+
+function submitPsWT(){
+  if(dictationActiveField==='ps-obs-notes')stopDictation();
+  const principal=document.getElementById('ps-observer').value;
+  const teacher=document.getElementById('ps-teacher-name').value;
+  const grade=document.getElementById('ps-grade').value.trim();
+  const time=document.getElementById('ps-obs-time').value;
+  const obsNotes=document.getElementById('ps-obs-notes').value.trim();
+  const fbHighlights=document.getElementById('ps-fb-highlights').value.trim();
+  const oppGrowth=document.getElementById('ps-opp-growth').value.trim();
+  const fbReflection=document.getElementById('ps-fb-reflection').value.trim();
+  if(!principal||!teacher||!Object.keys(psFormState.selLF).length){alert('Please select an observer, teacher, and at least one look-for.');return;}
+  const sd=psLookFors.filter(lf=>psFormState.selLF[lf.id]).map(lf=>({title:lf.title,rating:psFormState.ratings[lf.id]||'1',comment:psFormState.lfComments[lf.id]||''}));
+  const or=getOR(sd);
+  if(psEditingId){
+    const wt=psWalkthroughs.find(w=>String(w.id)===String(psEditingId));
+    if(!wt){cancelPsEdit();return;}
+    Object.assign(wt,{principal,teacher,grade,time,obsNotes,fbHighlights,oppGrowth,fbReflection,selectedData:sd,overallRating:or,synced:false});
+    savePsData();savePsToCloud(wt);
+    const banner=document.getElementById('ps-success-banner');
+    banner.style.display='flex';banner.className='banner banner-success';
+    banner.innerHTML='<i class="ti ti-circle-check"></i> Observation updated!';
+    cancelPsEdit();renderPsFeedback();
+    setTimeout(()=>{banner.style.display='none';},2000);
+    return;
+  }
+  const d=time?new Date(time):new Date();
+  const dateStr=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const wt={id:String(Date.now()),type:'Preschool',principal,teacher,grade,time,obsNotes,fbHighlights,oppGrowth,fbReflection,selectedData:sd,date:dateStr,isoDate:d.toISOString(),overallRating:or,followUpNotes:[],synced:false};
+  psWalkthroughs.unshift(wt);
+  savePsData();savePsToCloud(wt);clearPsForm();renderPsFeedback();
+  const banner=document.getElementById('ps-success-banner');
+  banner.style.display='flex';banner.className='banner banner-success';
+  banner.innerHTML='<i class="ti ti-circle-check"></i> Observation saved!';
+  setTimeout(()=>{banner.style.display='none';},2500);
+}
+
+function cancelPsEdit(){
+  psEditingId=null;
+  document.getElementById('ps-edit-banner').style.display='none';
+  document.getElementById('ps-btn-save').innerHTML='<i class="ti ti-device-floppy"></i> Save Observation';
+  clearPsForm();
+}
+
+function editPsWT(id){
+  const wt=psWalkthroughs.find(w=>String(w.id)===String(id));
+  if(!wt)return;
+  psEditingId=id;
+  document.getElementById('ps-observer').value=wt.principal;
+  document.getElementById('ps-teacher-name').value=wt.teacher;
+  document.getElementById('ps-grade').value=wt.grade||'';
+  document.getElementById('ps-obs-time').value=wt.time||'';
+  document.getElementById('ps-obs-notes').value=wt.obsNotes||'';
+  document.getElementById('ps-fb-highlights').value=wt.fbHighlights||'';
+  document.getElementById('ps-opp-growth').value=wt.oppGrowth||'';
+  document.getElementById('ps-fb-reflection').value=wt.fbReflection||'';
+  psFormState.selLF={};psFormState.ratings={};psFormState.lfComments={};
+  (wt.selectedData||[]).forEach(d=>{
+    const lf=psLookFors.find(l=>l.title===d.title);
+    if(lf){psFormState.selLF[lf.id]=true;psFormState.ratings[lf.id]=d.rating;psFormState.lfComments[lf.id]=d.comment||'';}
+  });
+  renderPsLFGrid();
+  document.getElementById('ps-edit-banner').style.display='flex';
+  document.getElementById('ps-btn-save').innerHTML='<i class="ti ti-device-floppy"></i> Update Observation';
+  sv('preschool');
+}
+
+function deletePsWT(id){
+  if(!confirm('Delete this observation?'))return;
+  const wt=psWalkthroughs.find(w=>String(w.id)===String(id));
+  psWalkthroughs=psWalkthroughs.filter(w=>String(w.id)!==String(id));
+  savePsData();
+  if(wt)deleteFromSupabase('ps_'+wt.id);
+  renderPsFeedback();
+}
+
+function clearPsForm(){
+  if(dictationActiveField==='ps-obs-notes')stopDictation();
+  ['ps-obs-notes','ps-fb-highlights','ps-opp-growth','ps-fb-reflection','ps-grade'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  if(!psEditingId){
+    const obs=document.getElementById('ps-observer');
+    if(obs&&!(currentUser&&!currentUser.admin))obs.value='';
+  }
+  psFormState.selLF={};psFormState.ratings={};psFormState.lfComments={};
+  renderPsLFGrid();
+}
+
+function renderPsFeedback(){
+  const el=document.getElementById('ps-feedback-list');
+  if(!el)return;
+  const fp=document.getElementById('ps-filter-p')?.value||'';
+  let filtered=currentUser&&(currentUser.admin||currentUser.preschool===true)?psWalkthroughs:psWalkthroughs.filter(w=>w.principal===currentUser?.name);
+  if(fp)filtered=filtered.filter(w=>w.principal===fp);
+  if(!filtered.length){el.innerHTML=`<div class="empty"><i class="ti ti-clipboard-text"></i>${psWalkthroughs.length?'No observations match this filter.':'No preschool observations yet.'}</div>`;return;}
+  el.innerHTML='<div class="wt-list">'+filtered.map(w=>{
+    const notesHtml=(w.followUpNotes||[]).map(n=>`<div class="note-item"><div class="note-dot"></div><div class="note-text">${n.text}</div><div class="note-date">${n.date}</div></div>`).join('');
+    const canEdit=currentUser&&(currentUser.admin||currentUser.name===w.principal);
+    return `<div class="wi">
+      <div class="wi-header">
+        <div><span class="wi-name">${w.teacher}</span>${w.grade?`<span style="font-size:11px;color:var(--text3);margin-left:8px;">${w.grade}</span>`:''}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;"><span class="badge ${badgeCls(w.overallRating)}">${w.overallRating}</span><span style="font-size:11px;color:var(--text3);">${w.date}${fmtTime(w.time)?' · '+fmtTime(w.time):''}</span></div>
+      </div>
+      <div class="wi-meta">${w.principal}</div>
+      <div class="wi-tags">${(w.selectedData||[]).map(d=>`<span class="badge ${badgeCls(d.rating)}">${d.title}: ${d.rating}</span>`).join('')}</div>
+      ${w.fbHighlights?`<div class="wi-section"><div class="wi-section-label">Powerful Practices</div><div class="wi-fb">${w.fbHighlights}</div></div>`:''}
+      ${w.oppGrowth?`<div class="wi-section"><div class="wi-section-label">Opportunities for Growth</div><div class="wi-fb">${w.oppGrowth}</div></div>`:''}
+      ${w.fbReflection?`<div class="wi-section"><div class="wi-section-label">Reflections</div><div class="wi-fb">${w.fbReflection}</div></div>`:''}
+      ${!w.fbHighlights&&!w.oppGrowth&&!w.fbReflection?'<div style="font-size:12px;color:var(--text3);font-style:italic;margin-top:8px;">No written feedback recorded for this observation.</div>':''}
+      <div class="email-row">
+        ${canEdit?`<button class="btn btn-secondary btn-sm" onclick="editPsWT(${w.id})"><i class="ti ti-edit"></i> Edit</button><button class="btn btn-secondary btn-sm" style="color:var(--red);" onclick="deletePsWT(${w.id})"><i class="ti ti-trash"></i> Delete</button>`:''}
+        <button class="btn btn-outlook btn-sm" onclick="openPsOutlook(${w.id})"><i class="ti ti-mail"></i> Open in Outlook</button>
+        <button class="btn btn-secondary btn-sm" onclick="copyPsFeedback(${w.id},'ps-toast-${w.id}')"><i class="ti ti-copy"></i> Copy Feedback</button>
+        <div class="copy-toast" id="ps-toast-${w.id}"><i class="ti ti-check"></i> Copied!</div>
+      </div>
+      <div class="notes-section">
+        <div class="note-label"><i class="ti ti-notes" style="vertical-align:-2px;margin-right:4px;"></i>Follow-Up Notes${(w.followUpNotes||[]).length?' ('+(w.followUpNotes||[]).length+')':''}</div>
+        ${notesHtml}
+        <div class="note-add-row">
+          <input type="text" id="ps-note-${w.id}" placeholder="Add a follow-up note..." onkeydown="if(event.key==='Enter')addPsNote(${w.id},'ps-note-${w.id}')">
+          <button class="btn btn-primary btn-sm" onclick="addPsNote(${w.id},'ps-note-${w.id}')"><i class="ti ti-plus"></i></button>
+        </div>
+      </div>
+    </div>`;
+  }).join('')+'</div>';
+}
+
+function addPsNote(id,inputId){
+  const inp=document.getElementById(inputId);if(!inp)return;
+  const text=inp.value.trim();if(!text)return;
+  const wt=psWalkthroughs.find(w=>String(w.id)===String(id));if(!wt)return;
+  if(!wt.followUpNotes)wt.followUpNotes=[];
+  wt.followUpNotes.push({text,date:new Date().toLocaleDateString(),id:Date.now()});
+  savePsData();inp.value='';renderPsFeedback();
+}
+
+function openPsOutlook(id){
+  const wt=psWalkthroughs.find(w=>String(w.id)===String(id));if(!wt)return;
+  const subj=encodeURIComponent(`Preschool Observation — ${wt.teacher} — ${wt.date}`);
+  const body=encodeURIComponent(buildPsFeedbackText(wt));
+  window.open(`https://outlook.office.com/mail/deeplink/compose?to=&subject=${subj}&body=${body}`,'_blank');
+}
+
+function copyPsFeedback(id,toastId){
+  const wt=psWalkthroughs.find(w=>String(w.id)===String(id));if(!wt)return;
+  navigator.clipboard.writeText(buildPsFeedbackText(wt)).then(()=>{
+    const t=document.getElementById(toastId);if(!t)return;
+    t.style.display='flex';setTimeout(()=>t.style.display='none',2000);
+  });
+}
+
+function buildPsFeedbackText(wt){
+  const lines=[`Preschool Observation — ${wt.teacher}`,`Date: ${wt.date}${fmtTime(wt.time)?' · '+fmtTime(wt.time):''}`,`Observer: ${wt.principal}`,wt.grade?`Room: ${wt.grade}`:'',''];
+  wt.selectedData.forEach(d=>lines.push(`${d.title}: ${d.rating}/4${d.comment?' — '+d.comment:''}`));
+  if(wt.fbHighlights)lines.push('','Powerful Practices:',wt.fbHighlights);
+  if(wt.oppGrowth)lines.push('','Opportunities for Growth:',wt.oppGrowth);
+  if(wt.fbReflection)lines.push('','Reflections:',wt.fbReflection);
+  return lines.filter(l=>l!==undefined).join('\n');
+}
+
+async function aiDraftPsFeedback(){
+  const obs=document.getElementById('ps-observer').value;
+  const teacher=document.getElementById('ps-teacher-name').value;
+  const notes=document.getElementById('ps-obs-notes').value.trim();
+  const sd=psLookFors.filter(lf=>psFormState.selLF[lf.id]).map(lf=>({title:lf.title,rating:psFormState.ratings[lf.id]||'—'}));
+  if(!teacher||!sd.length){alert('Please select a teacher and at least one look-for first.');return;}
+  const btn=document.getElementById('ps-btn-ai-draft');
+  const status=document.getElementById('ps-ai-draft-status');
+  btn.disabled=true;status.style.display='inline';status.textContent='Drafting feedback...';
+  const prompt=`You are a helpful instructional coach writing preschool observation feedback. Write warm, specific, growth-oriented feedback for a preschool teacher named ${teacher} observed by ${obs||'an administrator'}.\n\nLook-for ratings (1-4):\n${sd.map(d=>`- ${d.title}: ${d.rating}`).join('\n')}\n\nObserver notes: ${notes||'(none)'}\n\nWrite:\n1. Powerful Practices (2-3 sentences highlighting genuine strengths)\n2. Opportunities for Growth (1-2 sentences framed positively)\n3. Reflections (1 sentence for the teacher to consider)\n\nBe specific, kind, and professional. Use early childhood education language appropriate for a preschool context.`;
+  try{
+    const text=await callClaude(prompt);
+    const pp=text.match(/Powerful Practices[:\s]*([\s\S]*?)(?=Opportunities|$)/i);
+    const og=text.match(/Opportunities[^:]*[:\s]*([\s\S]*?)(?=Reflections|$)/i);
+    const rf=text.match(/Reflections[:\s]*([\s\S]*?)$/i);
+    if(pp)document.getElementById('ps-fb-highlights').value=pp[1].trim();
+    if(og)document.getElementById('ps-opp-growth').value=og[1].trim();
+    if(rf)document.getElementById('ps-fb-reflection').value=rf[1].trim();
+    status.textContent='✓ Done';setTimeout(()=>{status.style.display='none';},2000);
+  }catch(e){status.textContent='Error — please try again.';}
+  btn.disabled=false;
+}
+
+function exportPsXL(){
+  if(!psWalkthroughs.length){alert('No preschool observations to export.');return;}
+  const wb=XLSX.utils.book_new();
+  const hdr=['Date','Observer','Teacher','Room','Overall',...psLookFors.map(l=>l.title),'Powerful Practices','Opportunities for Growth','Reflections','Notes'];
+  const rows=psWalkthroughs.map(w=>{
+    const lfCols=psLookFors.map(lf=>{const d=(w.selectedData||[]).find(s=>s.title===lf.title);return d?d.rating:'—';});
+    const notes=(w.followUpNotes||[]).map(n=>`[${n.date}] ${n.text}`).join(' | ');
+    return [w.date,w.principal,w.teacher,w.grade||'',w.overallRating,...lfCols,w.fbHighlights||'',w.oppGrowth||'',w.fbReflection||'',notes];
+  });
+  const ws=XLSX.utils.aoa_to_sheet([hdr,...rows]);
+  ws['!cols']=[{wch:12},{wch:22},{wch:20},{wch:14},{wch:10},...psLookFors.map(()=>({wch:10})),{wch:50},{wch:50},{wch:50},{wch:40}];
+  XLSX.utils.book_append_sheet(wb,ws,'Preschool Observations');
+  XLSX.writeFile(wb,`Preschool_Observations_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// Preschool Settings functions
+function renderPsManage(){
+  const el=document.getElementById('ps-lf-manage-list');if(!el)return;
+  el.innerHTML=psLookFors.map(lf=>`<div class="lmi"><i class="ti ${lf.icon}" style="font-size:16px;color:var(--blue);margin-top:2px;"></i><div class="lmi-info"><div class="lmi-title">${lf.title}</div><div class="lmi-desc">${(lf.bullets||[]).slice(0,2).join(' · ')}</div></div><div style="display:flex;gap:5px;flex-shrink:0;"><button class="btn-icon danger" onclick="deletePsLF('${lf.id}')"><i class="ti ti-trash"></i></button></div></div>`).join('');
+}
+function togglePsAddF(){const f=document.getElementById('ps-add-lf-form');f.style.display=f.style.display==='none'?'block':'none';}
+function addPsLF(){
+  const title=document.getElementById('ps-new-lf-title').value.trim();
+  const desc=document.getElementById('ps-new-lf-desc').value.trim();
+  if(!title){alert('Please enter a title.');return;}
+  const bullets=desc?desc.split('\n').map(s=>s.trim()).filter(Boolean):['Custom look-for'];
+  psLookFors.push({id:'ps_'+Date.now(),icon:'ti-target',title,bullets});
+  togglePsAddF();renderPsManage();savePsSettings();
+}
+function deletePsLF(id){
+  if(!confirm('Remove this look-for?'))return;
+  psLookFors=psLookFors.filter(l=>l.id!==id);renderPsManage();savePsSettings();
+}
+function renderPsTeacherManage(){
+  const el=document.getElementById('ps-teacher-manage-list');if(!el)return;
+  el.innerHTML=psTeachers.map((t,i)=>`<div class="lmi"><div class="tp-av" style="width:32px;height:32px;font-size:11px;flex-shrink:0;">${tInit(t)}</div><div class="lmi-info"><div class="lmi-title">${t}</div></div><button class="btn-icon danger" onclick="deletePsTeacher(${i})"><i class="ti ti-trash"></i></button></div>`).join('');
+}
+function togglePsAddT(){const f=document.getElementById('ps-add-t-form');f.style.display=f.style.display==='none'?'block':'none';}
+function addPsTeacher(){
+  const name=document.getElementById('ps-new-t-name').value.trim();
+  if(!name)return;
+  if(!psTeachers.includes(name))psTeachers.push(name);
+  document.getElementById('ps-new-t-name').value='';
+  togglePsAddT();renderPsTeacherManage();savePsSettings();initPsDropdowns();
+}
+function deletePsTeacher(i){
+  if(!confirm(`Remove ${psTeachers[i]}?`))return;
+  psTeachers.splice(i,1);renderPsTeacherManage();savePsSettings();
+}
+
+// Preschool observer/account management
+function renderPsObserverManage(){
+  const el=document.getElementById('ps-observer-manage-list');if(!el)return;
+  const psUsers=users.filter(u=>u.preschool||u.admin);
+  el.innerHTML=psUsers.map((u,i)=>`<div class="lmi">
+    <div class="tp-av" style="width:32px;height:32px;font-size:11px;flex-shrink:0;${u.admin?'background:#FFF3CD;color:#856404;':'background:var(--blue-lt);color:var(--blue);'}">${tInit(u.name)}</div>
+    <div class="lmi-info">
+      <div class="lmi-title">${u.name}${u.admin?' <span style="font-size:10px;background:#FFF3CD;color:#856404;border-radius:4px;padding:1px 6px;font-weight:700;margin-left:6px;">ADMIN</span>':''}</div>
+      <div class="lmi-desc">${u.email||''} · pwd: ${u.password}</div>
+    </div>
+    ${!u.admin?`<button class="btn-icon danger" onclick="deletePsObserver('${u.name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>`:''}
+  </div>`).join('');
+}
+function addPsObserver(){
+  const name=prompt('Observer full name:');if(!name||!name.trim())return;
+  const email=prompt('Email (optional):','')||'';
+  const pwd=prompt('Password:');if(!pwd||!pwd.trim()){alert('Password is required.');return;}
+  const trimmedName=name.trim();
+  if(users.find(u=>u.name===trimmedName)){alert('A user with that name already exists.');return;}
+  users.push({name:trimmedName,email:email.trim(),password:pwd.trim(),admin:false,preschool:true});
+  if(!psPrincipals.includes(trimmedName))psPrincipals.push(trimmedName);
+  initLoginScreen();initPsDropdowns();renderPsObserverManage();saveSettings();savePsSettings();
+}
+function deletePsObserver(name){
+  if(name===currentUser?.name){alert("You can't remove your own account.");return;}
+  if(!confirm(`Remove ${name}? They won't be able to log in.`))return;
+  users=users.filter(u=>u.name!==name);
+  psPrincipals=psPrincipals.filter(p=>p!==name);
+  initLoginScreen();initPsDropdowns();renderPsObserverManage();saveSettings();savePsSettings();
+}
+function renderPsPEditor(){renderPsObserverManage();} // kept for sv() compat
+
+// Preschool storage
+function savePsData(){try{localStorage.setItem('walkthru_ps_data',JSON.stringify(psWalkthroughs));}catch(e){}}
+function loadPsData(){try{const s=localStorage.getItem('walkthru_ps_data');if(s)psWalkthroughs=JSON.parse(s);}catch(e){}}
+function savePsSettings(){
+  try{localStorage.setItem('walkthru_ps_settings',JSON.stringify({psLookFors,psTeachers,psPrincipals}));}catch(e){}
+  savePsSettingsToCloud();
+}
+function loadPsSettings(){
+  try{const s=localStorage.getItem('walkthru_ps_settings');if(s){const p=JSON.parse(s);if(p.psLookFors&&p.psLookFors.length)psLookFors=p.psLookFors;if(p.psTeachers)psTeachers=p.psTeachers;if(p.psPrincipals&&p.psPrincipals.length)psPrincipals=p.psPrincipals;}}catch(e){}
+}
+async function savePsToCloud(wt){
+  if(!SB_URL||SB_URL.indexOf('YOUR_SUPABASE')===0)return;
+  try{await fetch(`${SB_URL}/rest/v1/${SB_TABLE}`,{method:'POST',headers:{...sbHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:'ps_'+wt.id,data:{...wt,__isPreschool:true}})});}catch(e){}
+}
+async function savePsSettingsToCloud(){
+  if(!SB_URL||SB_URL.indexOf('YOUR_SUPABASE')===0)return;
+  try{await fetch(`${SB_URL}/rest/v1/${SB_TABLE}`,{method:'POST',headers:{...sbHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:'_ps_settings',data:{__isPsSettings:true,psLookFors,psTeachers,psPrincipals}})});}catch(e){}
+}
+
 function exportXL(){
   const exportData=visibleWalkthroughs();
   if(!exportData.length){alert('No walkthrough data to export yet.');return;}
@@ -2117,10 +2587,13 @@ async function clearAllData(){
 }
 
 const now=new Date(),pad=n=>String(n).padStart(2,'0');
-document.getElementById('obs-time').value=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
-document.getElementById('obs-time-f').value=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
-loadData();
+const nowStr=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+document.getElementById('obs-time').value=nowStr;
+document.getElementById('obs-time-f').value=nowStr;
+document.getElementById('ps-obs-time').value=nowStr;loadData();
 loadSettings();
+loadPsData();
+loadPsSettings();
 initDropdowns();
 initLoginScreen();
 renderLFGrid();
