@@ -851,8 +851,15 @@ async function loadFromSharePoint(){
       if(settingsRow.teacherAssignments)teacherAssignments=settingsRow.teacherAssignments;
       saveSettings();
     }
-    const sbWTs=all.filter(d=>d&&!d.__isSettings);
-    // Keep local-only items not yet synced, merge with server data
+    const sbWTs=all.filter(d=>d&&!d.__isSettings&&!d.__isArchive);
+    // If Supabase has zero observations, treat that as authoritative (handles admin resets).
+    // This ensures a reset by the CAO propagates to every principal on their next sync.
+    if(sbWTs.length===0){
+      walkthroughs=[];
+      saveData();
+      return true;
+    }
+    // Otherwise keep any local-only items not yet synced, merge with server data
     const localOnly=walkthroughs.filter(w=>w.synced!==true&&!sbWTs.find(s=>String(s.id)===String(w.id)));
     walkthroughs=[...localOnly,...sbWTs];
     saveData();
