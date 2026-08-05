@@ -677,9 +677,7 @@ async function refreshLoginList(){
   btn.textContent='Refreshing...';
   btn.disabled=true;
   try{
-    const r=await fetch(`${SB_URL}/rest/v1/${SB_TABLE}?select=data&order=created_at.desc&limit=1000&_=${Date.now()}`,{
-      headers:sbReadHeaders(),cache:'no-store'
-    });
+    const r=await sbGet('select=data&order=created_at.desc&limit=1000');
     if(r.ok){
       const rows=await r.json();
       const all=rows.map(row=>row.data).filter(Boolean);
@@ -950,48 +948,33 @@ Formatting rules — follow exactly:
 //       create policy "Allow all" on walkthroughs for all using (true) with check (true);
 //  3. Go to Settings > API and copy your Project URL and anon/public key below
 // ============================================================
-const SB_URL = 'https://ypswzsblbyyinixksser.supabase.co';   // e.g. https://xyzxyz.supabase.co
-const SB_KEY = 'sb_publishable_0ThUtwJ51u67ITxoowGOBA_yK76Bex3';      // starts with eyJ...
-const SB_TABLE = 'walkthroughs';
+// All data traffic routes through /.netlify/functions/data (same-domain proxy).
+// This ensures browsers behind IT policies that block external APIs still work.
+// The actual Supabase URL and key are stored as Netlify environment variables.
+const DATA_URL = '/.netlify/functions/data';
 
-function sbHeaders(){
-  const isNewKey = SB_KEY.startsWith('sb_');
-  return {
-    'Content-Type':'application/json',
-    'apikey': SB_KEY,
-    'Authorization': isNewKey ? `Bearer ${SB_KEY}` : `Bearer ${SB_KEY}`,
-    'Prefer': 'return=minimal'
-  };
+function sbPost(id, data){
+  return fetch(DATA_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,data})});
 }
-
-function sbReadHeaders(){
-  return {
-    'apikey': SB_KEY,
-    'Accept':'application/json'
-  };
+function sbGet(params){
+  return fetch(`${DATA_URL}?${params}&_=${Date.now()}`,{headers:{'Content-Type':'application/json'}});
+}
+function sbDel(id){
+  return fetch(`${DATA_URL}?id=${encodeURIComponent(id)}`,{method:'DELETE'});
 }
 
 async function saveToSharePoint(wt){
   // Called saveToSharePoint to avoid renaming all call sites — actually saves to Supabase
-  if(!SB_URL || SB_URL.indexOf('YOUR_SUPABASE')===0){console.warn('Supabase not configured yet');return false;}
   try{
-    const r=await fetch(`${SB_URL}/rest/v1/${SB_TABLE}`,{
-      method:'POST',
-      headers:{...sbHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},
-      body:JSON.stringify({id:String(wt.id),data:wt})
-    });
+    const r=await sbPost(String(wt.id),wt);
     if(r.ok||r.status===201||r.status===204){console.log('Saved to Supabase');return true;}
     const err=await r.text();console.warn('Supabase save failed:',err);return false;
   }catch(e){console.warn('Supabase error:',e);return false;}
 }
 
 async function deleteFromSupabase(wtId){
-  if(!SB_URL || SB_URL.indexOf('YOUR_SUPABASE')===0){console.warn('Supabase not configured yet');return false;}
   try{
-    const r=await fetch(`${SB_URL}/rest/v1/${SB_TABLE}?id=eq.${encodeURIComponent(String(wtId))}`,{
-      method:'DELETE',
-      headers:sbHeaders()
-    });
+    const r=await sbDel(String(wtId));
     if(r.ok||r.status===204){console.log('Deleted from Supabase');return true;}
     const err=await r.text();console.warn('Supabase delete failed:',err);return false;
   }catch(e){console.warn('Supabase delete error:',e);return false;}
@@ -999,12 +982,8 @@ async function deleteFromSupabase(wtId){
 
 async function loadFromSharePoint(){
   // Called loadFromSharePoint to avoid renaming all call sites — actually loads from Supabase
-  if(!SB_URL || SB_URL.indexOf('YOUR_SUPABASE')===0){console.warn('Supabase not configured yet');return false;}
   try{
-    const r=await fetch(`${SB_URL}/rest/v1/${SB_TABLE}?select=data&order=created_at.desc&limit=1000&_=${Date.now()}`,{
-      headers:sbReadHeaders(),
-      cache:'no-store'
-    });
+    const r=await sbGet('select=data&order=created_at.desc&limit=1000');
     if(!r.ok)return false;
     const rows=await r.json();
     const all=rows.map(row=>row.data).filter(Boolean);
@@ -1053,14 +1032,9 @@ async function loadFromSharePoint(){
 }
 
 async function saveSettingsToCloud(){
-  if(!SB_URL || SB_URL.indexOf('YOUR_SUPABASE')===0){console.warn('Supabase not configured yet — settings saved locally only');return false;}
   try{
     const payload={__isSettings:true,teachers,lookFors,principals,teacherAssignments,users};
-    const r=await fetch(`${SB_URL}/rest/v1/${SB_TABLE}`,{
-      method:'POST',
-      headers:{...sbHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},
-      body:JSON.stringify({id:'_settings',data:payload})
-    });
+    const r=await sbPost('_settings',payload);
     if(r.ok||r.status===201||r.status===204){console.log('Settings synced to Supabase');return true;}
     const err=await r.text();console.warn('Settings cloud save failed:',err);return false;
   }catch(e){console.warn('Settings cloud save error:',e);return false;}
@@ -1929,13 +1903,8 @@ function guessSchoolYear(){
   return `${y-1}-${String(y).slice(2)}`;
 }
 async function saveArchiveToCloud(year,data){
-  if(!SB_URL||SB_URL.indexOf('YOUR_SUPABASE')===0)return;
   try{
-    await fetch(`${SB_URL}/rest/v1/${SB_TABLE}`,{
-      method:'POST',
-      headers:{...sbHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},
-      body:JSON.stringify({id:`_archive_${year}`,data:{__isArchive:true,year,archivedAt:new Date().toISOString(),walkthroughs:data}})
-    });
+    await sbPost(`_archive_${year}`,{__isArchive:true,year,archivedAt:new Date().toISOString(),walkthroughs:data});
   }catch(e){console.warn('Archive cloud save error:',e);}
 }
 function renderPastYears(){
@@ -2358,13 +2327,11 @@ function loadPsSettings(){
   try{const s=localStorage.getItem('walkthru_ps_settings');if(s){const p=JSON.parse(s);if(p.psLookFors&&p.psLookFors.length)psLookFors=p.psLookFors;if(p.psTeachers)psTeachers=p.psTeachers;if(p.psPrincipals&&p.psPrincipals.length)psPrincipals=p.psPrincipals;}}catch(e){}
 }
 async function savePsToCloud(wt){
-  if(!SB_URL||SB_URL.indexOf('YOUR_SUPABASE')===0)return;
-  try{await fetch(`${SB_URL}/rest/v1/${SB_TABLE}`,{method:'POST',headers:{...sbHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:'ps_'+wt.id,data:{...wt,__isPreschool:true}})});}catch(e){}
+  try{await sbPost('ps_'+wt.id,{...wt,__isPreschool:true});}catch(e){}
 }
 async function savePsSettingsToCloud(){
-  if(!SB_URL||SB_URL.indexOf('YOUR_SUPABASE')===0)return false;
   try{
-    const r=await fetch(`${SB_URL}/rest/v1/${SB_TABLE}`,{method:'POST',headers:{...sbHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:'_ps_settings',data:{__isPsSettings:true,psLookFors,psTeachers,psPrincipals}})});
+    const r=await sbPost('_ps_settings',{__isPsSettings:true,psLookFors,psTeachers,psPrincipals});
     if(r.ok||r.status===201||r.status===204)return true;
     const err=await r.text();console.warn('PS settings cloud save failed:',err);return false;
   }catch(e){console.warn('PS settings cloud save error:',e);return false;}
@@ -2629,14 +2596,14 @@ async function clearAllData(){
 
   // 1. Delete each observation from Supabase individually (using the proven delete function)
   let cloudOk=true;
-  if(SB_URL&&SB_URL.indexOf('YOUR_SUPABASE')!==0){
+  {
     try{
-      const r=await fetch(`${SB_URL}/rest/v1/${SB_TABLE}?select=id&_=${Date.now()}`,{headers:sbReadHeaders(),cache:'no-store'});
+      const r=await sbGet('select=id');
       if(r.ok){
         const rows=await r.json();
         const ids=rows.map(x=>x.id).filter(id=>!String(id).startsWith('_'));
         for(const id of ids){
-          const ok=await deleteFromSupabase(id);
+          const dr=await sbDel(id);const ok=dr.ok||dr.status===204;
           if(!ok)cloudOk=false;
         }
       }
