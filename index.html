@@ -26,10 +26,10 @@
   --radius:8px;--radius-lg:12px;
 }
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:var(--bg2);color:var(--text);font-size:14px;min-height:100vh;}
-.nav{display:flex;align-items:center;background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
-.nav-brand{font-size:13px;font-weight:600;color:var(--blue);padding:12px 18px;border-right:1px solid var(--border);display:flex;align-items:center;gap:7px;white-space:nowrap;}
+.nav{display:flex;align-items:center;background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,0.06);min-width:0;}
+.nav-brand{font-size:13px;font-weight:600;color:var(--blue);padding:8px 12px;border-right:1px solid var(--border);display:flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0;}
 .nav-brand i{font-size:18px;}
-.nav-tabs{display:flex;overflow-x:auto;}
+.nav-tabs{display:flex;overflow-x:auto;flex:1;min-width:0;}
 .nt{padding:12px 16px;font-size:13px;cursor:pointer;color:var(--text2);border-bottom:3px solid transparent;background:none;border-top:none;border-left:none;border-right:none;display:flex;align-items:center;gap:6px;white-space:nowrap;font-family:inherit;transition:color .15s;}
 .nt:hover{color:var(--text);background:var(--bg2);}
 .nt.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:600;}
@@ -360,8 +360,7 @@ tr:hover td{background:#fafcff;}
       <select id="filter-r" onchange="renderFB()"><option value="">All ratings</option><option value="4">4 only</option><option value="3">3 and up</option><option value="2">2 and up</option><option value="1">1 and up</option></select>
     </div>
     <button class="btn btn-green btn-sm" onclick="exportXL()"><i class="ti ti-file-spreadsheet"></i> Export to Excel</button>
-  </div>
-  <div id="feedback-list"><div class="empty"><i class="ti ti-clipboard-text"></i>No walkthroughs yet. Submit one on the Walkthrough tab.</div></div>
+    <button class="btn btn-green btn-sm" onclick="exportByTeacher()"><i class="ti ti-user-check"></i> Export by Teacher</button><div class="empty"><i class="ti ti-clipboard-text"></i>No walkthroughs yet. Submit one on the Walkthrough tab.</div></div>
 </div>
 
 <!-- TEACHERS -->
@@ -381,8 +380,7 @@ tr:hover td{background:#fafcff;}
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
     <div class="sec-label" style="margin-bottom:0;" id="dash-heading">CAO Overview</div>
     <button class="btn btn-green btn-sm" onclick="exportXL()"><i class="ti ti-file-spreadsheet"></i> Export to Excel</button>
-  </div>
-  <div class="metric-grid">
+    <button class="btn btn-green btn-sm" onclick="exportByTeacher()"><i class="ti ti-user-check"></i> Export by Teacher</button>
     <div class="mc"><div class="ml">Total Observations</div><div class="mv" id="m-total">0</div><div class="ms" id="m-total-sub">all principals</div></div>
     <div class="mc"><div class="ml">Teachers Observed</div><div class="mv" id="m-teachers">0</div><div class="ms">unique classrooms</div></div>
     <div class="mc"><div class="ml">Avg Rating</div><div class="mv" id="m-avg">—</div><div class="ms">across all look-fors</div></div>
@@ -1822,6 +1820,50 @@ function exportXL(){
   const ws3=XLSX.utils.aoa_to_sheet([lfHdr,...lfRows]);ws3['!cols']=[{wch:28},{wch:14},{wch:14},{wch:12},{wch:12},{wch:18},{wch:12}];
   XLSX.utils.book_append_sheet(wb,ws3,'Look-For Analysis');
   XLSX.writeFile(wb,`Classroom_Walkthroughs_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+function exportByTeacher(){
+  const exportData=visibleWalkthroughs();
+  if(!exportData.length){alert('No walkthrough data to export yet.');return;}
+  const wb=XLSX.utils.book_new();
+
+  // Sheet 1: Teacher Summary — one row per teacher
+  const sumHdr=['Teacher','Principal(s)','Total Observations','Walkthroughs','Formal Observations','Avg Overall Rating',...lookFors.map(l=>l.title+' Avg'),'Last Observed'];
+  const teacherNames=[...new Set(exportData.map(w=>w.teacher))].sort((a,b)=>a.localeCompare(b));
+  const sumRows=teacherNames.map(t=>{
+    const tw=exportData.filter(w=>tKey(w.teacher)===tKey(t));
+    const obs=[...new Set(tw.map(w=>w.principal).filter(Boolean))].join(', ');
+    const wts=tw.filter(w=>!w.type||w.type==='Walkthrough').length;
+    const fos=tw.filter(w=>w.type==='Formal Observation').length;
+    const sc=tw.filter(w=>parseFloat(w.overallRating)>0);
+    const avg=sc.length?(sc.reduce((s,w)=>s+parseFloat(w.overallRating),0)/sc.length).toFixed(1):'—';
+    const lfAvgs=lookFors.map(lf=>{
+      const lfData=tw.flatMap(w=>w.selectedData.filter(d=>d.title===lf.title&&ratingByLabel(d.rating).score>0));
+      return lfData.length?(lfData.reduce((s,d)=>s+ratingByLabel(d.rating).score,0)/lfData.length).toFixed(1):'—';
+    });
+    const dates=tw.map(w=>w.date||'').filter(Boolean).sort();
+    const lastObs=dates.length?dates[dates.length-1]:'—';
+    return [t,obs,tw.length,wts,fos,avg,...lfAvgs,lastObs];
+  });
+  const ws1=XLSX.utils.aoa_to_sheet([sumHdr,...sumRows]);
+  ws1['!cols']=[{wch:22},{wch:28},{wch:18},{wch:14},{wch:18},{wch:16},...lookFors.map(()=>({wch:14})),{wch:14}];
+  XLSX.utils.book_append_sheet(wb,ws1,'Teacher Summary');
+
+  // Sheet 2: One sheet per teacher (all their observations)
+  teacherNames.forEach(t=>{
+    const tw=exportData.filter(w=>tKey(w.teacher)===tKey(t));
+    const hdr=['Date','Type','Observer','Grade/Subject','Overall',...lookFors.map(l=>l.title),'Powerful Practices','Opportunities for Growth','Reflections'];
+    const rows=tw.sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(w=>{
+      const lfCols=lookFors.map(lf=>{const d=w.selectedData.find(s=>s.title===lf.title);return d?d.rating:'—';});
+      return [w.date,w.type||'Walkthrough',w.principal,w.grade||'',w.overallRating,...lfCols,w.fbHighlights||'',w.oppGrowth||'',w.fbReflection||''];
+    });
+    // Excel sheet names max 31 chars, no special chars
+    const sheetName=t.replace(/[:\\\/?*\[\]]/g,'').slice(0,31);
+    const ws=XLSX.utils.aoa_to_sheet([hdr,...rows]);
+    ws['!cols']=[{wch:12},{wch:16},{wch:22},{wch:16},{wch:10},...lookFors.map(()=>({wch:10})),{wch:50},{wch:50},{wch:50}];
+    XLSX.utils.book_append_sheet(wb,ws,sheetName);
+  });
+
+  XLSX.writeFile(wb,`Walkthroughs_By_Teacher_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 function renderManage(){document.getElementById('lf-manage-list').innerHTML=lookFors.map(lf=>`<div class="lmi"><i class="ti ti-grip-vertical" style="color:var(--text3);font-size:18px;margin-top:2px;"></i><i class="ti ${lf.icon}" style="font-size:16px;color:var(--blue);margin-top:2px;"></i><div class="lmi-info"><div class="lmi-title">${lf.title}</div><div class="lmi-desc">${(lf.bullets||[]).join(' · ')}</div></div><div style="display:flex;gap:5px;flex-shrink:0;"><button class="btn-icon" onclick="startEdit('${lf.id}')"><i class="ti ti-edit"></i></button><button class="btn-icon danger" onclick="deleteLF('${lf.id}')"><i class="ti ti-trash"></i></button></div></div>`).join('');}
 function renderPEditor(){document.getElementById('principal-editor').innerHTML=`<div class="row2" style="margin-bottom:16px;">${principals.map((p,i)=>`<div class="fg"><label>Observer ${i+1}</label><input type="text" value="${p}" onchange="principals[${i}]=this.value;initDropdowns();saveSettings();"></div>`).join('')}</div>`;}
