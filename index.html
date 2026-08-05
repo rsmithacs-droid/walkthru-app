@@ -1881,8 +1881,13 @@ async function forcePushSettings(){
   if(el)el.textContent='Pushing to cloud...';
   const ok1=await saveSettingsToCloud();
   const ok2=await savePsSettingsToCloud();
-  if(el)el.textContent=(ok1&&ok2)?'✓ All settings pushed to cloud — other browsers will sync on next load.':'⚠ Push failed — check that Supabase is online at supabase.com';
-  setTimeout(()=>{if(el)el.textContent='';},5000);
+  if(ok1&&ok2){
+    if(el)el.textContent='✓ All settings pushed to cloud — other browsers will sync on next load.';
+  } else {
+    const which=!ok1&&!ok2?'both K-12 and preschool settings':!ok1?'K-12 settings':'preschool settings';
+    if(el)el.textContent=`⚠ Push failed for ${which}. Open browser console (F12) for details.`;
+  }
+  setTimeout(()=>{if(el)el.textContent='';},6000);
 }
 function guessSchoolYear(){
   const now=new Date();
@@ -2326,8 +2331,12 @@ async function savePsToCloud(wt){
   try{await fetch(`${SB_URL}/rest/v1/${SB_TABLE}`,{method:'POST',headers:{...sbHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:'ps_'+wt.id,data:{...wt,__isPreschool:true}})});}catch(e){}
 }
 async function savePsSettingsToCloud(){
-  if(!SB_URL||SB_URL.indexOf('YOUR_SUPABASE')===0)return;
-  try{await fetch(`${SB_URL}/rest/v1/${SB_TABLE}`,{method:'POST',headers:{...sbHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:'_ps_settings',data:{__isPsSettings:true,psLookFors,psTeachers,psPrincipals}})});}catch(e){}
+  if(!SB_URL||SB_URL.indexOf('YOUR_SUPABASE')===0)return false;
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/${SB_TABLE}`,{method:'POST',headers:{...sbHeaders(),'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:'_ps_settings',data:{__isPsSettings:true,psLookFors,psTeachers,psPrincipals}})});
+    if(r.ok||r.status===201||r.status===204)return true;
+    const err=await r.text();console.warn('PS settings cloud save failed:',err);return false;
+  }catch(e){console.warn('PS settings cloud save error:',e);return false;}
 }
 
 function exportXL(){
