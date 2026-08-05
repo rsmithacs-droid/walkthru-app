@@ -971,8 +971,9 @@ async function loadFromSharePoint(){
   // Called loadFromSharePoint to avoid renaming all call sites — actually loads from Supabase
   if(!SB_URL || SB_URL.indexOf('YOUR_SUPABASE')===0){console.warn('Supabase not configured yet');return false;}
   try{
-    const r=await fetch(`${SB_URL}/rest/v1/${SB_TABLE}?select=data&order=created_at.desc&limit=1000`,{
-      headers:sbReadHeaders()
+    const r=await fetch(`${SB_URL}/rest/v1/${SB_TABLE}?select=data&order=created_at.desc&limit=1000&_=${Date.now()}`,{
+      headers:sbReadHeaders(),
+      cache:'no-store'
     });
     if(!r.ok)return false;
     const rows=await r.json();
@@ -2600,7 +2601,7 @@ async function clearAllData(){
   let cloudOk=true;
   if(SB_URL&&SB_URL.indexOf('YOUR_SUPABASE')!==0){
     try{
-      const r=await fetch(`${SB_URL}/rest/v1/${SB_TABLE}?select=id`,{headers:sbReadHeaders()});
+      const r=await fetch(`${SB_URL}/rest/v1/${SB_TABLE}?select=id&_=${Date.now()}`,{headers:sbReadHeaders(),cache:'no-store'});
       if(r.ok){
         const rows=await r.json();
         const ids=rows.map(x=>x.id).filter(id=>!String(id).startsWith('_'));
