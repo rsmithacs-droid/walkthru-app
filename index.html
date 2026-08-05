@@ -2037,7 +2037,8 @@ async function syncSP(){
   if(btn){btn.innerHTML='<i class="ti ti-loader"></i> Syncing...';btn.disabled=true;}
   const ok=await loadFromSharePoint();
   initDropdowns();renderLFGrid();renderLFGridFor('fo');
-  updateDash();renderFB();renderTeacherGrid();
+  updateDash();try{if(document.getElementById('feedback-list'))renderFB();}catch(e){}
+  renderTeacherGrid();
   if(btn){btn.innerHTML='<i class="ti ti-refresh"></i> Sync with Cloud';btn.disabled=false;}
   const ind=document.getElementById('storage-indicator');
   if(ind)ind.textContent=(ok?'✓ Synced with cloud · ':'⚠ Cloud unavailable — saved locally · ')+walkthroughs.length+' walkthroughs';
@@ -2104,8 +2105,11 @@ async function clearAllData(){
   localStorage.removeItem('walkthru_data');
   walkthroughs=[];
 
-  // 3. Refresh all views
-  updateDash();renderFB();renderTeacherGrid();renderHeatmap();
+  // 3. Refresh all views safely
+  try{updateDash();}catch(e){}
+  try{if(document.getElementById('feedback-list'))renderFB();}catch(e){}
+  try{renderTeacherGrid();}catch(e){}
+  try{renderHeatmap();}catch(e){}
   if(btn){btn.innerHTML='<i class="ti ti-trash"></i> Reset All Observation Data';btn.disabled=false;}
   alert(cloudOk
     ?'✓ All observation data cleared from this device and the cloud. Ready for a fresh start!'
