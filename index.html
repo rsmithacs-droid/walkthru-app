@@ -218,6 +218,9 @@ tr:hover td{background:#fafcff;}
     <label class="login-label">Password</label>
     <input type="password" id="login-password" class="login-input" placeholder="Enter your password" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <div style="text-align:center;margin-top:10px;">
+      <button onclick="refreshLoginList()" style="background:none;border:none;color:var(--blue);font-size:11px;cursor:pointer;text-decoration:underline;">Don't see your name? Tap to refresh list</button>
+    </div>
     <div class="login-err" id="login-err">Incorrect password. Please try again.</div>
   </div>
 </div>
@@ -669,6 +672,33 @@ function doLogin(){
   applyLogin();
 }
 
+async function refreshLoginList(){
+  const btn=event.target;
+  btn.textContent='Refreshing...';
+  btn.disabled=true;
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/${SB_TABLE}?select=data&order=created_at.desc&limit=1000&_=${Date.now()}`,{
+      headers:sbReadHeaders(),cache:'no-store'
+    });
+    if(r.ok){
+      const rows=await r.json();
+      const all=rows.map(row=>row.data).filter(Boolean);
+      const settingsRow=all.find(d=>d&&d.__isSettings);
+      if(settingsRow&&settingsRow.users&&settingsRow.users.length){
+        users=settingsRow.users;
+        initLoginScreen();
+        btn.textContent='✓ List updated!';
+      } else {
+        btn.textContent='No updates found';
+      }
+    } else {
+      btn.textContent='Could not connect — try again';
+    }
+  }catch(e){
+    btn.textContent='Could not connect — try again';
+  }
+  setTimeout(()=>{btn.textContent="Don't see your name? Tap to refresh list";btn.disabled=false;},3000);
+}
 function doLogout(){
   sessionStorage.removeItem('wt_user');
   currentUser=null;
