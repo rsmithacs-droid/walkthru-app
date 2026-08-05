@@ -2630,26 +2630,33 @@ const now=new Date(),pad=n=>String(n).padStart(2,'0');
 const nowStr=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
 document.getElementById('obs-time').value=nowStr;
 document.getElementById('obs-time-f').value=nowStr;
-document.getElementById('ps-obs-time').value=nowStr;loadData();
-loadSettings();
-loadPsData();
-loadPsSettings();
-initDropdowns();
-initLoginScreen();
-renderLFGrid();
-renderLFGridFor('fo');
-updateDash();
-renderFB();
-// Check for existing session
-const savedSession=sessionStorage.getItem('wt_user');
-if(savedSession){
+document.getElementById('ps-obs-time').value=nowStr;
+
+// Load local data as fallback first
+loadData();loadSettings();loadPsData();loadPsSettings();
+
+// Then immediately fetch latest from Supabase BEFORE showing login screen
+// This ensures every browser always starts with the same fresh data
+(async function initApp(){
   try{
-    currentUser=JSON.parse(savedSession);
-    applyLogin();
-  }catch(e){sessionStorage.removeItem('wt_user');}
-}
-// Sync with cloud after UI is ready
-setTimeout(()=>syncSP(),500);
+    await loadFromSharePoint();
+  }catch(e){console.warn('Could not load from cloud on startup:',e);}
+  // Now initialize UI with latest data
+  initDropdowns();
+  initLoginScreen();
+  renderLFGrid();
+  renderLFGridFor('fo');
+  updateDash();
+  // Check for existing session
+  const savedSession=sessionStorage.getItem('wt_user');
+  if(savedSession){
+    try{
+      currentUser=JSON.parse(savedSession);
+      applyLogin();
+    }catch(e){sessionStorage.removeItem('wt_user');}
+  }
+})();
+
 </script>
 </body>
 </html>
