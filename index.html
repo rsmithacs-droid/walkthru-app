@@ -1555,6 +1555,7 @@ function addNote(wtId,inputId,refresh){
 }
 function renderFB(){
   const container=document.getElementById('feedback-list');
+  if(!container)return;
   const fp=document.getElementById('filter-p')?.value||'';
   const fr=document.getElementById('filter-r')?.value||'';
   let filtered=visibleWalkthroughs();
