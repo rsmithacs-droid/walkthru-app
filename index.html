@@ -985,7 +985,25 @@ async function loadFromSharePoint(){
       if(settingsRow.users&&settingsRow.users.length)users=settingsRow.users;
       saveSettings();
     }
-    const sbWTs=all.filter(d=>d&&!d.__isSettings&&!d.__isArchive);
+    // Also load preschool settings from the _ps_settings record
+    const psSettingsRow=all.find(d=>d&&d.__isPsSettings);
+    if(psSettingsRow){
+      if(psSettingsRow.psLookFors&&psSettingsRow.psLookFors.length)psLookFors=psSettingsRow.psLookFors;
+      if(psSettingsRow.psTeachers)psTeachers=psSettingsRow.psTeachers;
+      if(psSettingsRow.psPrincipals&&psSettingsRow.psPrincipals.length)psPrincipals=psSettingsRow.psPrincipals;
+      savePsSettings();
+    }
+    // Load preschool observations separately
+    const psSbWTs=all.filter(d=>d&&d.__isPreschool);
+    if(psSbWTs.length){
+      const psLocalOnly=psWalkthroughs.filter(w=>w.synced!==true&&!psSbWTs.find(s=>String(s.id)===String(w.id)));
+      psWalkthroughs=[...psLocalOnly,...psSbWTs];
+      savePsData();
+    } else if(all.some(d=>d&&d.__isPsSettings)){
+      // _ps_settings exists but no ps observations — treat as authoritative empty
+      psWalkthroughs=[];savePsData();
+    }
+    const sbWTs=all.filter(d=>d&&!d.__isSettings&&!d.__isArchive&&!d.__isPreschool&&!d.__isPsSettings);
     // If Supabase has zero observations, treat that as authoritative (handles admin resets).
     // This ensures a reset by the CAO propagates to every principal on their next sync.
     if(sbWTs.length===0){
@@ -2509,6 +2527,10 @@ async function syncSP(){
   initDropdowns();renderLFGrid();renderLFGridFor('fo');
   updateDash();try{if(document.getElementById('feedback-list'))renderFB();}catch(e){}
   renderTeacherGrid();
+  // Refresh preschool views and login screen with synced data
+  initLoginScreen();
+  try{if(document.getElementById('ps-feedback-list'))renderPsFeedback();}catch(e){}
+  try{if(document.getElementById('ps-lf-grid'))renderPsLFGrid();}catch(e){}
   if(btn){btn.innerHTML='<i class="ti ti-refresh"></i> Sync with Cloud';btn.disabled=false;}
   const ind=document.getElementById('storage-indicator');
   if(ind)ind.textContent=(ok?'✓ Synced with cloud · ':'⚠ Cloud unavailable — saved locally · ')+walkthroughs.length+' walkthroughs';
