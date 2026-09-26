@@ -668,7 +668,7 @@ function doLogin(){
   if(!user){err.style.display='block';return;}
   err.style.display='none';
   currentUser = user;
-  sessionStorage.setItem('wt_user', JSON.stringify({name:user.name, email:user.email, admin:user.admin}));
+  sessionStorage.setItem('wt_user', JSON.stringify({name:user.name}));
   applyLogin();
 }
 
@@ -716,9 +716,10 @@ function applyLogin(){
   // Non-admins: hide Look-Fors settings tab
   document.getElementById('tab-settings').style.display=currentUser.admin?'':'none';
   // Preschool tab: show for admin or users flagged as preschool
-  const showPS=currentUser.admin||currentUser.preschool;
-  document.getElementById('tab-preschool').style.display=showPS?'':'none';
-  document.getElementById('tab-ps-settings').style.display=currentUser.admin?'':'none';
+  // Preschool is merged into the main system: one roster, one set of forms,
+  // one dashboard. The old separate preschool tabs stay hidden.
+  document.getElementById('tab-preschool').style.display='none';
+  document.getElementById('tab-ps-settings').style.display='none';
   // Relabel the dashboard tab: admin sees the full CAO Dashboard, principals see their own
   document.getElementById('tab-dashboard-label').textContent=currentUser.admin?'CAO Dashboard':'My Dashboard';
   // Refresh teacher dropdowns now that we know who's logged in (filters by assignment)
@@ -732,15 +733,17 @@ function applyLogin(){
     }
   });
   sv('walkthrough');
+  runPreschoolMergeIfNeeded();
 }
 
 // Filter walkthroughs by current user if not admin
 function visibleWalkthroughs(){
   if(!currentUser||currentUser.admin) return walkthroughs;
-  // Show every observation for any teacher assigned to this principal, regardless of who observed them.
-  // Teachers with no assignments are visible to everyone by default (see teachersFor()).
-  const myTeachers=new Set(teachersFor(currentUser.name,false).map(t=>tKey(t)));
-  return walkthroughs.filter(w=>myTeachers.has(tKey(w.teacher)));
+  // A principal sees only the observations they conducted themselves.
+  // Previously this matched on teacher assignment instead, so any observation
+  // of a shared teacher appeared on every assigned principal's pages — which is
+  // how principals ended up reading one another's write-ups.
+  return walkthroughs.filter(w=>w.principal===currentUser.name);
 }
 
 
@@ -966,7 +969,7 @@ function sbDel(id){
 async function saveToSharePoint(wt){
   // Called saveToSharePoint to avoid renaming all call sites — actually saves to Supabase
   try{
-    const r=await sbPost(String(wt.id),wt);
+    const r=await sbPost(String(wt.id),{...wt,synced:true});
     if(r.ok||r.status===201||r.status===204){console.log('Saved to Supabase');return true;}
     const err=await r.text();console.warn('Supabase save failed:',err);return false;
   }catch(e){console.warn('Supabase error:',e);return false;}
@@ -1040,6 +1043,73 @@ async function saveSettingsToCloud(){
   }catch(e){console.warn('Settings cloud save error:',e);return false;}
 }
 
+// ============================================================
+//  PRESCHOOL MERGE (runs once, safe to repeat)
+//  Preschool used to live in its own settings record with its own observers
+//  and teachers. That left preschool principals absent from the principals
+//  list and with no teacher assignments, so their dropdowns came up empty and
+//  their work never reached the dashboard. This folds them into the single
+//  shared roster. The old preschool look-fors remain in the _ps_settings
+//  record untouched, so they can be restored if the school wants them back.
+// ============================================================
+let psMergeDirty=false;
+function mergePreschoolIntoMain(){
+  let changed=false;
+  const psObservers=[...new Set([
+    ...(Array.isArray(psPrincipals)?psPrincipals:[]),
+    ...users.filter(u=>u&&u.preschool).map(u=>u.name)
+  ])].filter(Boolean);
+  const admins=users.filter(u=>u&&u.admin).map(u=>u.name);
+
+  psObservers.forEach(p=>{if(!principals.includes(p)){principals.push(p);changed=true;}});
+  principals.sort((a,b)=>a.localeCompare(b));
+
+  (Array.isArray(psTeachers)?psTeachers:[]).forEach(t=>{
+    if(!t)return;
+    if(!teachers.includes(t)){teachers.push(t);changed=true;}
+    const cur=teacherAssignments[t]||[];
+    const want=[...new Set([...cur,...psObservers,...admins])];
+    if(want.length!==cur.length){teacherAssignments[t]=want;changed=true;}
+  });
+  teachers.sort((a,b)=>a.localeCompare(b));
+
+  // Anything recorded on the old preschool form joins the main observation list
+  if(Array.isArray(psWalkthroughs)&&psWalkthroughs.length){
+    psWalkthroughs.slice().forEach(w=>{
+      if(!w||walkthroughs.find(x=>String(x.id)===String(w.id)))return;
+      const moved={...w};
+      delete moved.__isPreschool;
+      moved.type=moved.type||'Walkthrough';
+      moved.followUpNotes=moved.followUpNotes||[];
+      moved.synced=false;
+      walkthroughs.unshift(moved);
+      changed=true;
+      saveToSharePoint(moved);
+    });
+    psWalkthroughs=[];savePsData();saveData();
+  }
+  if(changed)psMergeDirty=true;
+  return changed;
+}
+
+async function runPreschoolMergeIfNeeded(){
+  mergePreschoolIntoMain();
+  if(!(currentUser&&currentUser.admin))return;
+  if(!psMergeDirty)return;
+  try{localStorage.setItem('walkthru_settings',JSON.stringify({teachers,lookFors,principals,teacherAssignments,users}));}catch(e){}
+  const ok=await saveSettingsToCloud();
+  initDropdowns();
+  try{updateDash();}catch(e){}
+  const ind=document.getElementById('storage-indicator');
+  if(ok){
+    psMergeDirty=false;
+    console.log('Preschool merged into the main roster and pushed to the cloud.');
+  }else{
+    console.warn('Preschool merged on this device, but the cloud push failed.');
+    if(ind)ind.textContent='\u26a0 Preschool merge saved on this device only \u2014 the cloud push failed. Open Settings and press Push Settings to Cloud.';
+  }
+}
+
 function ratingByLabel(label){return RATINGS.find(r=>r.label===label)||RATINGS[0];}
 function badgeCls(label){const r=RATINGS.find(r=>r.label===label);return r?r.badgeCls:'bno';}
 
@@ -1086,12 +1156,15 @@ let teachers=['Ahnert','Barfield','Bengelink','Bennett','Cairns','Cannon','Carpe
 let teacherAssignments={};
 function teachersFor(principalName,isAdmin){
   if(isAdmin)return teachers;
-  return teachers.filter(t=>{
-    const assigned=teacherAssignments[t];
-    return !assigned||!assigned.length||assigned.includes(principalName);
-  });
+  // A teacher is visible to a principal ONLY when explicitly assigned.
+  // Previously an unassigned teacher fell through to every principal, which is
+  // why principals could see one another's teachers. Unassigned teachers now
+  // show to admins only, and Settings flags them so they can be assigned.
+  return teachers.filter(t=>(teacherAssignments[t]||[]).includes(principalName));
 }
+function unassignedTeachers(){return teachers.filter(t=>!(teacherAssignments[t]||[]).length);}
 let walkthroughs=[],selIcon=ICONS[0],editId=null,editSelIcon=ICONS[0];
+let wtBusy=false,wtBusyF=false;
 
 function sv(n){
   if(dictationActiveField&&n!=='walkthrough'&&n!=='formal')stopDictation();
@@ -1293,6 +1366,11 @@ function submitWT(){
   const fbText=[fbHighlights?'POWERFUL PRACTICES:\n'+fbHighlights:'',fbReflection?'REFLECTIONS:\n'+fbReflection:''].filter(Boolean).join('\n\n');
   const st=formState.wt;
   if(!principal||!teacher||!Object.keys(st.selLF).length){alert('Please select a principal, enter a teacher name, and select at least one look-for.');return;}
+  if(wtBusy)return;
+  wtBusy=true;
+  const saveBtn=document.getElementById('btn-save-wt');
+  if(saveBtn)saveBtn.disabled=true;
+  setTimeout(()=>{wtBusy=false;const b=document.getElementById('btn-save-wt');if(b)b.disabled=false;},2500);
   const sd=lookFors.filter(lf=>st.selLF[lf.id]).map(lf=>({title:lf.title,rating:st.ratings[lf.id]||'1',comment:st.lfComments[lf.id]||''}));
   const type='Walkthrough';
 
@@ -1337,6 +1415,11 @@ function submitWTf(){
   const fbText=[fbHighlights?'POWERFUL PRACTICES:\n'+fbHighlights:'',oppGrowth?'OPPORTUNITIES FOR GROWTH:\n'+oppGrowth:'',fbReflection?'REFLECTIONS:\n'+fbReflection:''].filter(Boolean).join('\n\n');
   const st=formState.fo;
   if(!principal||!teacher||!Object.keys(st.selLF).length){alert('Please select a principal, enter a teacher name, and select at least one look-for.');return;}
+  if(wtBusyF)return;
+  wtBusyF=true;
+  const saveBtnF=document.getElementById('btn-save-wt-f');
+  if(saveBtnF)saveBtnF.disabled=true;
+  setTimeout(()=>{wtBusyF=false;const b=document.getElementById('btn-save-wt-f');if(b)b.disabled=false;},2500);
   const sd=lookFors.filter(lf=>st.selLF[lf.id]).map(lf=>({title:lf.title,rating:st.ratings[lf.id]||'1',comment:st.lfComments[lf.id]||''}));
   const type='Formal Observation';
 
@@ -1680,7 +1763,7 @@ function updateDash(){
   const headingEl=document.getElementById('dash-heading');
   if(headingEl)headingEl.textContent=isAdmin?'CAO Overview':'My Dashboard';
   const totalSubEl=document.getElementById('m-total-sub');
-  if(totalSubEl)totalSubEl.textContent=isAdmin?'all principals':'your assigned teachers';
+  if(totalSubEl)totalSubEl.textContent=isAdmin?'all principals':'observations you recorded';
   const dashTeacher=document.getElementById('dash-ai-teacher');
   if(dashTeacher){
     const cur=dashTeacher.value;
@@ -1706,7 +1789,7 @@ function updateDash(){
     if(barsTitleEl)barsTitleEl.textContent='Walkthroughs by Principal';
     const pCount={};principals.forEach(p=>pCount[p]=0);vw.forEach(w=>{if(pCount[w.principal]!==undefined)pCount[w.principal]++;});
     const maxP=Math.max(...Object.values(pCount),1);
-    document.getElementById('principal-bars').innerHTML=principals.map((p,i)=>{const init=p.split(' ').map(n=>n[0]).join('').slice(0,2);const pct=Math.round(pCount[p]/maxP*100);return `<div class="p-row"><div class="p-av" style="background:${PC[i]};color:${PT[i]}">${init}</div><div style="flex:1"><div class="p-name">${p}</div><div class="p-sub">${pCount[p]} walkthrough${pCount[p]!==1?'s':''}</div></div><div class="p-bar-w"><div class="p-bar-bg"><div class="p-bar-f" style="width:${pct}%"></div></div></div><div class="p-cnt">${pCount[p]}</div></div>`;}).join('');
+    document.getElementById('principal-bars').innerHTML=principals.map((p,i)=>{const init=p.split(' ').map(n=>n[0]).join('').slice(0,2);const pct=Math.round(pCount[p]/maxP*100);const ci=i%PC.length;return `<div class="p-row"><div class="p-av" style="background:${PC[ci]};color:${PT[ci]}">${init}</div><div style="flex:1"><div class="p-name">${p}</div><div class="p-sub">${pCount[p]} walkthrough${pCount[p]!==1?'s':''}</div></div><div class="p-bar-w"><div class="p-bar-bg"><div class="p-bar-f" style="width:${pct}%"></div></div></div><div class="p-cnt">${pCount[p]}</div></div>`;}).join('');
   }else{
     if(barsTitleEl)barsTitleEl.textContent='Observations by Teacher';
     const tCount={};vw.forEach(w=>{tCount[w.teacher]=(tCount[w.teacher]||0)+1;});
@@ -2293,7 +2376,7 @@ function renderPsObserverManage(){
     <div class="tp-av" style="width:32px;height:32px;font-size:11px;flex-shrink:0;${u.admin?'background:#FFF3CD;color:#856404;':'background:var(--blue-lt);color:var(--blue);'}">${tInit(u.name)}</div>
     <div class="lmi-info">
       <div class="lmi-title">${u.name}${u.admin?' <span style="font-size:10px;background:#FFF3CD;color:#856404;border-radius:4px;padding:1px 6px;font-weight:700;margin-left:6px;">ADMIN</span>':''}</div>
-      <div class="lmi-desc">${u.email||''} · pwd: ${u.password}</div>
+      <div class="lmi-desc">${u.email||''} · password hidden</div>
     </div>
     ${!u.admin?`<button class="btn-icon danger" onclick="deletePsObserver('${u.name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>`:''}
   </div>`).join('');
@@ -2412,7 +2495,7 @@ function renderUserManage(){
     <div class="tp-av" style="width:32px;height:32px;font-size:11px;flex-shrink:0;${u.admin?'background:#FFF3CD;color:#856404;':'background:var(--blue-lt);color:var(--blue);'}">${tInit(u.name)}</div>
     <div class="lmi-info">
       <div class="lmi-title">${u.name}${u.admin?' <span style="font-size:10px;background:#FFF3CD;color:#856404;border-radius:4px;padding:1px 6px;font-weight:700;margin-left:6px;">ADMIN</span>':''}</div>
-      <div class="lmi-desc">${u.email||''} · pwd: ${u.password}</div>
+      <div class="lmi-desc">${u.email||''} · password hidden</div>
     </div>
     <div style="display:flex;gap:5px;flex-shrink:0;">
       <button class="btn-icon" onclick="startEditUser(${i})" title="Edit"><i class="ti ti-edit"></i></button>
@@ -2471,7 +2554,9 @@ function deleteLF(id){if(!confirm('Remove this look-for?'))return;lookFors=lookF
 let addTOpen=false;
 function toggleAddT(){addTOpen=!addTOpen;document.getElementById('add-t-form').style.display=addTOpen?'block':'none';if(addTOpen){document.getElementById('new-t-name').value='';document.getElementById('new-t-name').focus();}}
 function renderTeacherManage(){
-  document.getElementById('teacher-manage-list').innerHTML=teachers.map((t,i)=>{
+  const orphans=unassignedTeachers();
+  const warn=orphans.length?`<div style="display:flex;align-items:flex-start;gap:8px;padding:11px 14px;border-radius:var(--radius);font-size:13px;margin-bottom:12px;background:var(--amber-lt);border:1px solid #d9a441;color:var(--amber);"><i class="ti ti-alert-triangle" style="margin-top:2px;"></i><span><strong>${orphans.length} teacher${orphans.length!==1?'s have':' has'} no principal assigned</strong> and will not appear for any principal: ${orphans.join(', ')}. Tick a principal below for each of them.</span></div>`:'';
+  document.getElementById('teacher-manage-list').innerHTML=warn+teachers.map((t,i)=>{
     const assigned=teacherAssignments[t]||[];
     const chips=principals.map(p=>{
       const checked=assigned.includes(p);
@@ -2486,7 +2571,7 @@ function renderTeacherManage(){
         <div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;">
           <span style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.03em;margin-right:2px;">Supervised by:</span>
           ${chips}
-          ${!assigned.length?'<span style="font-size:11px;color:var(--text3);font-style:italic;">All principals (unassigned)</span>':''}
+          ${!assigned.length?'<span style="font-size:11px;color:var(--amber);font-style:italic;">Not assigned \u2014 no principal can see this teacher</span>':''}
         </div>
       </div>
       <div style="display:flex;gap:5px;flex-shrink:0;margin-top:8px;"><button class="btn-icon danger" onclick="deleteTeacher(${i})"><i class="ti ti-trash"></i></button></div>
@@ -2502,6 +2587,7 @@ function toggleTeacherAssignment(teacherName,principalName,checked){
   }
   saveSettings();
   initDropdowns();
+  renderTeacherManage();
 }
 function addTeacher(){
   const input=document.getElementById('new-t-name');
@@ -2542,6 +2628,7 @@ async function syncSP(){
   const btn=document.getElementById('btn-sync');
   if(btn){btn.innerHTML='<i class="ti ti-loader"></i> Syncing...';btn.disabled=true;}
   const ok=await loadFromSharePoint();
+  try{mergePreschoolIntoMain();}catch(e){console.warn('Preschool merge skipped:',e);}
   initDropdowns();renderLFGrid();renderLFGridFor('fo');
   updateDash();try{if(document.getElementById('feedback-list'))renderFB();}catch(e){}
   renderTeacherGrid();
@@ -2570,10 +2657,14 @@ function loadData(){
     }
   }catch(e){console.warn('Storage load failed:',e);}
 }
+let _settingsPushTimer=null;
 function saveSettings(){
   try{localStorage.setItem('walkthru_settings', JSON.stringify({teachers,lookFors,principals,teacherAssignments,users}));}
   catch(e){console.warn('Settings save failed:',e);}
-  saveSettingsToCloud();
+  // Ticking several assignment boxes in a row used to fire one full cloud write
+  // per click, which is what made "push to cloud" fail. Collapse them into one.
+  clearTimeout(_settingsPushTimer);
+  _settingsPushTimer=setTimeout(()=>{saveSettingsToCloud();},800);
 }
 function loadSettings(){
   try{
@@ -2641,6 +2732,9 @@ loadData();loadSettings();loadPsData();loadPsSettings();
   try{
     await loadFromSharePoint();
   }catch(e){console.warn('Could not load from cloud on startup:',e);}
+  // Fold preschool into the shared roster in memory, so every browser sees the
+  // merged lists even before an admin has pushed the merge to the cloud.
+  try{mergePreschoolIntoMain();}catch(e){console.warn('Preschool merge skipped:',e);}
   // Now initialize UI with latest data
   initDropdowns();
   initLoginScreen();
@@ -2651,8 +2745,10 @@ loadData();loadSettings();loadPsData();loadPsSettings();
   const savedSession=sessionStorage.getItem('wt_user');
   if(savedSession){
     try{
-      currentUser=JSON.parse(savedSession);
-      applyLogin();
+      const saved=JSON.parse(savedSession);
+      const full=users.find(u=>u&&u.name===saved.name);
+      if(full){currentUser={...full};applyLogin();}
+      else{sessionStorage.removeItem('wt_user');}
     }catch(e){sessionStorage.removeItem('wt_user');}
   }
 })();
