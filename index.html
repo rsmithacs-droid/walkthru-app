@@ -80,6 +80,11 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0;}
 .mic-btn.recording{background:#FEE2E2;border-color:#EF4444;color:#B91C1C;animation:micPulse 1.4s ease-in-out infinite;}
 @keyframes micPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.4);}50%{box-shadow:0 0 0 6px rgba(239,68,68,0);}}
 .mic-btn.unsupported{opacity:0.4;cursor:not-allowed;}
+.scan-btn{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:100px;border:1px solid var(--border2);background:#fff;color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s;}
+.scan-btn:hover{border-color:var(--blue);color:var(--blue);}
+.scan-btn[disabled]{opacity:0.55;cursor:default;}
+.scan-note{display:none;align-items:flex-start;gap:8px;padding:10px 13px;border-radius:var(--radius);font-size:12px;line-height:1.55;margin-top:8px;background:var(--amber-lt);border:1px solid #d9a441;color:var(--amber);}
+.scan-note i{font-size:15px;margin-top:1px;flex-shrink:0;}
 .btn-secondary:hover{background:var(--bg2);}
 .btn-green{background:var(--green);color:#fff;}
 .btn-green:hover{background:#27500A;}
@@ -260,9 +265,14 @@ tr:hover td{background:#fafcff;}
     <div class="fg" style="margin-bottom:14px;">
       <label style="display:flex;align-items:center;justify-content:space-between;">
         <span>Observation Notes <span style="font-weight:400;color:var(--text3);">— script or context notes (optional)</span></span>
-        <button type="button" class="mic-btn" id="mic-btn" onclick="toggleDictation('obs-notes','mic-btn')"><i class="ti ti-microphone"></i> <span>Dictate</span></button>
+        <span style="display:inline-flex;gap:6px;">
+          <button type="button" class="scan-btn" id="scan-btn" onclick="document.getElementById('scan-file').click()"><i class="ti ti-camera"></i> <span>Scan handwritten notes</span></button>
+          <button type="button" class="mic-btn" id="mic-btn" onclick="toggleDictation('obs-notes','mic-btn')"><i class="ti ti-microphone"></i> <span>Dictate</span></button>
+        </span>
       </label>
+      <input type="file" id="scan-file" accept="image/jpeg,image/png,image/webp,image/gif" capture="environment" multiple style="display:none;" onchange="scanNotes('wt',this)">
       <textarea id="obs-notes" rows="3" placeholder="Script key moments, quotes, or context from the observation..."></textarea>
+      <div class="scan-note" id="scan-note"></div>
     </div>
     <hr class="div">
     <div class="sec-label">Look-Fors — Click a card to include it, then select a rating</div>
@@ -316,9 +326,14 @@ tr:hover td{background:#fafcff;}
     <div class="fg" style="margin-bottom:14px;">
       <label style="display:flex;align-items:center;justify-content:space-between;">
         <span>Observation Notes <span style="font-weight:400;color:var(--text3);">— script or context notes (optional)</span></span>
-        <button type="button" class="mic-btn" id="mic-btn-f" onclick="toggleDictation('obs-notes-f','mic-btn-f')"><i class="ti ti-microphone"></i> <span>Dictate</span></button>
+        <span style="display:inline-flex;gap:6px;">
+          <button type="button" class="scan-btn" id="scan-btn-f" onclick="document.getElementById('scan-file-f').click()"><i class="ti ti-camera"></i> <span>Scan handwritten notes</span></button>
+          <button type="button" class="mic-btn" id="mic-btn-f" onclick="toggleDictation('obs-notes-f','mic-btn-f')"><i class="ti ti-microphone"></i> <span>Dictate</span></button>
+        </span>
       </label>
+      <input type="file" id="scan-file-f" accept="image/jpeg,image/png,image/webp,image/gif" capture="environment" multiple style="display:none;" onchange="scanNotes('fo',this)">
       <textarea id="obs-notes-f" rows="3" placeholder="Script key moments, quotes, or context from the observation..."></textarea>
+      <div class="scan-note" id="scan-note-f"></div>
     </div>
     <hr class="div">
     <div class="sec-label">Look-Fors — Click a card to include it, then select a rating</div>
@@ -753,15 +768,170 @@ function visibleWalkthroughs(){
 //  this file or the browser.
 // ============================================================
 
-async function callClaude(prompt){
+async function callClaude(prompt,opts){
+  const payload={prompt};
+  if(opts&&Array.isArray(opts.images)&&opts.images.length)payload.images=opts.images;
+  if(opts&&opts.maxTokens)payload.maxTokens=opts.maxTokens;
   const r = await fetch('/.netlify/functions/claude',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ prompt })
+    body: JSON.stringify(payload)
   });
   if(!r.ok){const e=await r.text();throw new Error('API error: '+e);}
   const d=await r.json();
   return d.text||'';
+}
+
+// ============================================================
+//  HANDWRITTEN NOTE SCANNING
+//  A principal photographs the notes they wrote during the observation.
+//  Claude transcribes them and files any comment under the Look-For it
+//  belongs to. Ratings are never set from a photo: turning "pretty engaged,
+//  bit noisy" into a 3 is the observer's professional judgement, not the
+//  model's, and it ends up in an evaluation record.
+//  Nothing here reads from or writes to the database.
+// ============================================================
+const SCAN_MAX_IMAGES=4;
+const SCAN_MAX_EDGE=1568;  // the API resizes anything larger, so sending more is wasted
+function scanEsc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function scanEls(form){
+  const sfx=form==='fo'?'-f':'';
+  return {
+    btn:document.getElementById('scan-btn'+sfx),
+    note:document.getElementById('scan-note'+sfx),
+    notes:document.getElementById('obs-notes'+sfx)
+  };
+}
+function scanStatus(form,msg,tone){
+  const {note}=scanEls(form);
+  if(!note)return;
+  if(!msg){note.style.display='none';note.innerHTML='';return;}
+  const icon=tone==='error'?'ti-alert-triangle':tone==='busy'?'ti-loader':'ti-eye-check';
+  note.style.display='flex';
+  note.innerHTML=`<i class="ti ${icon}"></i><span>${msg}</span>`;
+}
+function scanBusy(form,busy){
+  const {btn}=scanEls(form);
+  if(!btn)return;
+  btn.disabled=!!busy;
+  const label=btn.querySelector('span');
+  if(label)label.textContent=busy?'Reading notes...':'Scan handwritten notes';
+}
+// Shrink in the browser: a phone photo is several megabytes, which is both
+// slow to upload and larger than the API will actually use.
+function shrinkImage(file){
+  return new Promise((resolve,reject)=>{
+    const url=URL.createObjectURL(file);
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const scale=Math.min(1,SCAN_MAX_EDGE/Math.max(img.width,img.height));
+        const w=Math.max(1,Math.round(img.width*scale));
+        const h=Math.max(1,Math.round(img.height*scale));
+        const c=document.createElement('canvas');c.width=w;c.height=h;
+        const ctx=c.getContext('2d');
+        ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
+        ctx.drawImage(img,0,0,w,h);
+        const dataUrl=c.toDataURL('image/jpeg',0.85);
+        URL.revokeObjectURL(url);
+        resolve({media_type:'image/jpeg',data:dataUrl.split(',')[1]});
+      }catch(e){URL.revokeObjectURL(url);reject(e);}
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('That file could not be opened as an image.'));};
+    img.src=url;
+  });
+}
+function scanPrompt(){
+  const list=lookFors.map(lf=>`- ${lf.title}: ${(lf.bullets||[]).join(' ')}`).join('\n');
+  return `These images are a principal's handwritten notes, taken during a classroom observation at a school.
+
+Transcribe them and sort them, following these rules exactly:
+
+1. Transcribe everything legible, keeping the observer's own words, spelling and shorthand. Do not polish, summarise or expand their writing.
+2. Where a word is genuinely unclear, transcribe your best reading followed by [?]. Never invent content to fill a gap.
+3. The school rates classroom practice against the look-fors below. Where a passage of the notes clearly concerns one of them, repeat that passage as a comment under that look-for, again in the observer's own words.
+4. Use a look-for title only if it appears in this list, copied exactly. If a passage fits none of them, leave it in the transcription only.
+5. Do not assign, suggest or mention any rating, score or number out of four. The observer decides those.
+
+Look-fors:
+${list}
+
+Return only JSON, with no commentary and no code fences, in exactly this shape:
+{"transcription":"the full transcription","lookFors":[{"title":"exact title from the list","comment":"the relevant passage in the observer's words"}]}
+
+If the images contain no legible handwriting, return {"transcription":"","lookFors":[]}.`;
+}
+function parseScanResponse(text){
+  if(!text)return null;
+  let s=String(text).trim();
+  s=s.replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'').trim();
+  const a=s.indexOf('{'),b=s.lastIndexOf('}');
+  if(a<0||b<a)return null;
+  try{
+    const o=JSON.parse(s.slice(a,b+1));
+    if(!o||typeof o!=='object')return null;
+    return {
+      transcription:typeof o.transcription==='string'?o.transcription.trim():'',
+      lookFors:Array.isArray(o.lookFors)?o.lookFors.filter(x=>x&&typeof x.title==='string'):[]
+    };
+  }catch(e){return null;}
+}
+function applyScannedNotes(form,parsed){
+  const st=formState[form];
+  const {notes}=scanEls(form);
+  const matched=[],unmatched=[];
+  if(parsed.transcription&&notes){
+    const existing=notes.value.trim();
+    notes.value=existing?existing+'\n\n'+parsed.transcription:parsed.transcription;
+  }
+  parsed.lookFors.forEach(item=>{
+    const lf=lookFors.find(l=>String(l.title).trim().toLowerCase()===String(item.title).trim().toLowerCase());
+    if(!lf){unmatched.push(String(item.title));return;}
+    st.selLF[lf.id]=true;                     // tick the look-for
+    const text=typeof item.comment==='string'?item.comment.trim():'';
+    if(text){
+      const prev=(st.lfComments[lf.id]||'').trim();
+      st.lfComments[lf.id]=prev?prev+' '+text:text;
+    }
+    // st.ratings is deliberately left alone — see the note at the top of this section
+    if(!matched.includes(lf.title))matched.push(lf.title);
+  });
+  if(unmatched.length)console.warn('Scan returned unrecognised look-for titles:',unmatched);
+  renderLFGridFor(form);
+  return {matched,unmatched};
+}
+async function scanNotes(form,input){
+  const files=input&&input.files?[...input.files]:[];
+  if(input)input.value='';   // so the same photo can be picked again
+  if(!files.length)return;
+  if(files.length>SCAN_MAX_IMAGES){
+    scanStatus(form,`Please choose at most ${SCAN_MAX_IMAGES} photos at a time. You can scan a second batch straight afterwards.`,'error');
+    return;
+  }
+  scanBusy(form,true);
+  scanStatus(form,'Reading your handwriting'+(files.length>1?' across '+files.length+' photos':'')+'. This usually takes a few seconds.','busy');
+  try{
+    const images=[];
+    for(const f of files)images.push(await shrinkImage(f));
+    const text=await callClaude(scanPrompt(),{images,maxTokens:3000});
+    const parsed=parseScanResponse(text);
+    if(!parsed||(!parsed.transcription&&!parsed.lookFors.length)){
+      scanStatus(form,'No handwriting could be read from that photo. Try again with more light and the page filling the frame, or type the notes in directly.','error');
+      return;
+    }
+    const {matched}=applyScannedNotes(form,parsed);
+    let msg='<strong>This is a draft from your notes \u2014 please read it before saving.</strong> ';
+    msg+=matched.length
+      ? `Comments were filed under ${matched.length} look-for${matched.length!==1?'s':''}: ${scanEsc(matched.join(', '))}. `
+      : 'Everything went into Observation Notes; nothing mapped clearly to a look-for. ';
+    msg+='No ratings were set \u2014 those are yours to choose. Handwriting can be misread, so check the wording against your page.';
+    scanStatus(form,msg,'review');
+  }catch(e){
+    console.warn('Scan error:',e);
+    scanStatus(form,'Those notes could not be read just now. Check your connection and try again, or type them in directly.','error');
+  }finally{
+    scanBusy(form,false);
+  }
 }
 
 async function aiDraftFeedback(isFormal){
@@ -1546,6 +1716,7 @@ function clearForm(){
   }
   document.getElementById('success-banner').style.display='none';
   formState.wt.selLF={};formState.wt.ratings={};formState.wt.lfComments={};renderLFGrid();
+  scanStatus('wt','');
 }
 
 function clearFormF(){
@@ -1557,6 +1728,7 @@ function clearFormF(){
   }
   document.getElementById('success-banner-f').style.display='none';
   formState.fo.selLF={};formState.fo.ratings={};formState.fo.lfComments={};renderLFGridFor('fo');
+  scanStatus('fo','');
 }
 function printObservation(wtId){
   const wt=walkthroughs.find(w=>String(w.id)===String(wtId));if(!wt)return;
