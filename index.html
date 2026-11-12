@@ -79,6 +79,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:18px 0;}
 .mic-btn:hover{border-color:var(--blue);color:var(--blue);}
 .mic-btn.recording{background:#FEE2E2;border-color:#EF4444;color:#B91C1C;animation:micPulse 1.4s ease-in-out infinite;}
 @keyframes micPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.4);}50%{box-shadow:0 0 0 6px rgba(239,68,68,0);}}
+.mic-btn.paused{background:var(--amber-lt);border-color:#d9a441;color:var(--amber);}
 .mic-btn.unsupported{opacity:0.4;cursor:not-allowed;}
 .scan-btn{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:100px;border:1px solid var(--border2);background:#fff;color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s;}
 .scan-btn:hover{border-color:var(--blue);color:var(--blue);}
@@ -268,6 +269,7 @@ tr:hover td{background:#fafcff;}
         <span style="display:inline-flex;gap:6px;">
           <button type="button" class="scan-btn" id="scan-btn" onclick="document.getElementById('scan-file').click()"><i class="ti ti-camera"></i> <span>Scan handwritten notes</span></button>
           <button type="button" class="mic-btn" id="mic-btn" onclick="toggleDictation('obs-notes','mic-btn')"><i class="ti ti-microphone"></i> <span>Dictate</span></button>
+          <button type="button" class="mic-btn" id="mic-stop-btn" style="display:none;" onclick="stopDictation()"><i class="ti ti-player-stop"></i> <span>Stop</span></button>
         </span>
       </label>
       <input type="file" id="scan-file" accept="image/jpeg,image/png,image/webp,image/gif" capture="environment" multiple style="display:none;" onchange="scanNotes('wt',this)">
@@ -329,6 +331,7 @@ tr:hover td{background:#fafcff;}
         <span style="display:inline-flex;gap:6px;">
           <button type="button" class="scan-btn" id="scan-btn-f" onclick="document.getElementById('scan-file-f').click()"><i class="ti ti-camera"></i> <span>Scan handwritten notes</span></button>
           <button type="button" class="mic-btn" id="mic-btn-f" onclick="toggleDictation('obs-notes-f','mic-btn-f')"><i class="ti ti-microphone"></i> <span>Dictate</span></button>
+          <button type="button" class="mic-btn" id="mic-stop-btn-f" style="display:none;" onclick="stopDictation()"><i class="ti ti-player-stop"></i> <span>Stop</span></button>
         </span>
       </label>
       <input type="file" id="scan-file-f" accept="image/jpeg,image/png,image/webp,image/gif" capture="environment" multiple style="display:none;" onchange="scanNotes('fo',this)">
@@ -465,6 +468,7 @@ tr:hover td{background:#fafcff;}
       <label style="display:flex;align-items:center;justify-content:space-between;">
         <span>Observation Notes <span style="font-weight:400;color:var(--text3);">— script or context notes (optional)</span></span>
         <button type="button" class="mic-btn" id="ps-mic-btn" onclick="toggleDictation('ps-obs-notes','ps-mic-btn')"><i class="ti ti-microphone"></i> <span>Dictate</span></button>
+        <button type="button" class="mic-btn" id="ps-mic-stop-btn" style="display:none;" onclick="stopDictation()"><i class="ti ti-player-stop"></i> <span>Stop</span></button>
       </label>
       <textarea id="ps-obs-notes" rows="3" placeholder="Script key moments, quotes, or context from the observation..."></textarea>
     </div>
@@ -1417,92 +1421,146 @@ function tInit(n){return n.replace(/^(Ms\.|Mr\.|Mrs\.|Dr\.)\s*/,'').split(' ').m
 // ============================================================
 let dictationRecognition=null;
 let dictationActiveField=null;
-let dictationBaseText='';
+let dictationActiveBtn=null;
+let dictationState='idle';     // 'idle' | 'recording' | 'paused'
+let dictationCommitted='';     // every finalised phrase so far — survives restarts
+let dictationRestartTimer=null;
 
 function getSpeechRecognition(){
   return window.SpeechRecognition||window.webkitSpeechRecognition||null;
 }
 
+function dictationStopBtnId(btnId){return btnId?btnId.replace('mic-btn','mic-stop-btn'):null;}
+
+function setDictationUI(btnId,state){
+  const btn=btnId?document.getElementById(btnId):null;
+  if(!btn)return;
+  const stop=document.getElementById(dictationStopBtnId(btnId));
+  const label=btn.querySelector('span'),icon=btn.querySelector('i');
+  btn.classList.toggle('recording',state==='recording');
+  btn.classList.toggle('paused',state==='paused');
+  if(label)label.textContent=state==='recording'?'Pause':state==='paused'?'Resume':'Dictate';
+  if(icon)icon.className=state==='recording'?'ti ti-player-pause':state==='paused'?'ti ti-player-play':'ti ti-microphone';
+  if(stop)stop.style.display=(state==='idle')?'none':'inline-flex';
+}
+
+// One button cycles Dictate -> Pause -> Resume; a separate Stop ends the session.
 function toggleDictation(fieldId,btnId){
-  const SR=getSpeechRecognition();
-  const btn=document.getElementById(btnId);
-  if(!SR){
+  if(!getSpeechRecognition()){
     alert('Voice dictation isn\'t supported in this browser. Please try Chrome or Edge, or type your notes manually.');
     return;
   }
-  // If already recording (on this or another field), stop it first
-  if(dictationRecognition&&dictationActiveField){
-    stopDictation();
-    if(dictationActiveField===fieldId)return; // user clicked the same mic to stop — done
+  if(dictationActiveField&&dictationActiveField!==fieldId)stopDictation();
+  if(dictationActiveField===fieldId){
+    if(dictationState==='recording'){pauseDictation();return;}
+    if(dictationState==='paused'){resumeDictation();return;}
   }
   startDictation(fieldId,btnId);
 }
 
 function startDictation(fieldId,btnId){
-  const SR=getSpeechRecognition();
   const field=document.getElementById(fieldId);
-  const btn=document.getElementById(btnId);
-  if(!field||!btn)return;
-  dictationBaseText=field.value?field.value.trim()+' ':'';
+  if(!field)return;
   dictationActiveField=fieldId;
-  dictationRecognition=new SR();
-  dictationRecognition.continuous=true;
-  dictationRecognition.interimResults=true;
-  dictationRecognition.lang='en-US';
+  dictationActiveBtn=btnId;
+  const existing=field.value.trim();
+  dictationCommitted=existing?existing+' ':'';
+  dictationState='recording';
+  setDictationUI(btnId,'recording');
+  launchRecognition();
+}
 
-  dictationRecognition.onresult=(event)=>{
-    let finalText='',interimText='';
-    for(let i=0;i<event.results.length;i++){
-      const transcript=event.results[i][0].transcript;
-      if(event.results[i].isFinal)finalText+=transcript+' ';
-      else interimText+=transcript;
+// A fresh recognition object each time. The browser ends a session by itself
+// after a stretch of quiet, so this gets relaunched repeatedly during one
+// sitting; dictationCommitted is what carries the words across those restarts.
+function launchRecognition(){
+  const SR=getSpeechRecognition();
+  const field=document.getElementById(dictationActiveField);
+  if(!SR||!field)return;
+  clearTimeout(dictationRestartTimer);
+  const rec=new SR();
+  dictationRecognition=rec;
+  rec.continuous=true;
+  rec.interimResults=true;
+  rec.lang='en-US';
+
+  rec.onresult=(event)=>{
+    let interim='';
+    // Start at resultIndex: anything before it was already banked.
+    for(let i=event.resultIndex;i<event.results.length;i++){
+      const t=event.results[i][0].transcript;
+      if(event.results[i].isFinal){
+        const phrase=t.trim();
+        if(phrase)dictationCommitted+=phrase+' ';
+      }else interim+=t;
     }
-    field.value=dictationBaseText+finalText+interimText;
+    field.value=dictationCommitted+interim;
   };
-  dictationRecognition.onerror=(event)=>{
-    console.warn('Dictation error:',event.error);
+
+  rec.onerror=(event)=>{
+    // Only a genuine permission failure should end the session. "no-speech"
+    // fires routinely during silent work time and must not stop anything.
     if(event.error==='not-allowed'||event.error==='service-not-allowed'){
       alert('Microphone access was blocked. Please allow microphone permissions for this site and try again.');
+      stopDictation();
+      return;
     }
-    stopDictation();
+    console.warn('Dictation hiccup (still listening):',event.error);
   };
-  dictationRecognition.onend=()=>{
-    // If it ended on its own (e.g. silence timeout) but the user hasn't clicked stop, restart it
-    if(dictationActiveField===fieldId){
-      try{dictationRecognition.start();}catch(e){stopDictation();}
-    }
+
+  rec.onend=()=>{
+    if(dictationRecognition!==rec)return;    // superseded by a newer session
+    if(dictationState!=='recording')return;  // paused or stopped deliberately
+    dictationRestartTimer=setTimeout(()=>{
+      if(dictationState==='recording')launchRecognition();
+    },300);
   };
-  try{
-    dictationRecognition.start();
-    btn.classList.add('recording');
-    btn.querySelector('span').textContent='Listening...';
-  }catch(e){
-    console.warn('Could not start dictation:',e);
-    stopDictation();
-  }
+
+  try{rec.start();}
+  catch(e){console.warn('Could not start dictation:',e);stopDictation();}
+}
+
+function pauseDictation(){
+  if(dictationState!=='recording')return;
+  dictationState='paused';
+  clearTimeout(dictationRestartTimer);
+  if(dictationRecognition){try{dictationRecognition.stop();}catch(e){}}
+  const field=document.getElementById(dictationActiveField);
+  if(field)field.value=dictationCommitted;  // drop any half-heard interim text
+  setDictationUI(dictationActiveBtn,'paused');
+}
+
+function resumeDictation(){
+  if(dictationState!=='paused')return;
+  const field=document.getElementById(dictationActiveField);
+  // Pick up anything typed by hand while paused, rather than overwriting it.
+  if(field){const v=field.value;dictationCommitted=v.trim()?v.replace(/\s+$/,'')+' ':'';}
+  dictationState='recording';
+  setDictationUI(dictationActiveBtn,'recording');
+  launchRecognition();
 }
 
 function stopDictation(){
-  const fieldId=dictationActiveField;
-  dictationActiveField=null; // clear first so onend doesn't auto-restart
+  const fieldId=dictationActiveField,btnId=dictationActiveBtn;
+  dictationState='idle';
+  clearTimeout(dictationRestartTimer);
   if(dictationRecognition){
-    try{dictationRecognition.stop();}catch(e){}
-    dictationRecognition=null;
+    const r=dictationRecognition;
+    dictationRecognition=null;     // cleared first so onend won't relaunch
+    try{r.stop();}catch(e){}
   }
-  if(fieldId){
-    const btnId=fieldId==='obs-notes'?'mic-btn':'mic-btn-f';
-    const btn=document.getElementById(btnId);
-    if(btn){btn.classList.remove('recording');btn.querySelector('span').textContent='Dictate';}
-    const field=document.getElementById(fieldId);
-    if(field)field.value=field.value.trim();
-  }
+  dictationActiveField=null;
+  dictationActiveBtn=null;
+  dictationCommitted='';
+  setDictationUI(btnId,'idle');
+  if(fieldId){const f=document.getElementById(fieldId);if(f)f.value=f.value.trim();}
 }
 
 // Hide/disable mic buttons up front if the browser truly doesn't support dictation
 // (script runs at end of body, so DOM is already ready — no need to wait for DOMContentLoaded)
 (function(){
   if(!getSpeechRecognition()){
-    ['mic-btn','mic-btn-f'].forEach(id=>{
+    ['mic-btn','mic-btn-f','ps-mic-btn'].forEach(id=>{
       const btn=document.getElementById(id);
       if(btn){btn.classList.add('unsupported');btn.title='Voice dictation is not supported in this browser';}
     });
