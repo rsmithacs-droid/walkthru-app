@@ -1425,6 +1425,8 @@ let dictationActiveBtn=null;
 let dictationState='idle';     // 'idle' | 'recording' | 'paused'
 let dictationCommitted='';     // every finalised phrase so far — survives restarts
 let dictationRestartTimer=null;
+let dictationIdSeq=0;          // every recognition object gets an id
+let dictationAcceptId=0;       // only this id may write to the notes field
 
 function getSpeechRecognition(){
   return window.SpeechRecognition||window.webkitSpeechRecognition||null;
@@ -1479,12 +1481,18 @@ function launchRecognition(){
   if(!SR||!field)return;
   clearTimeout(dictationRestartTimer);
   const rec=new SR();
+  rec._id=++dictationIdSeq;
+  dictationAcceptId=rec._id;   // supersedes any earlier object still winding down
   dictationRecognition=rec;
   rec.continuous=true;
   rec.interimResults=true;
   rec.lang='en-US';
 
   rec.onresult=(event)=>{
+    // Stopping delivers one last result after the handler below has run, so a
+    // just-stopped object is still allowed to deliver it. Only a newer session
+    // locks the old one out.
+    if(rec._id!==dictationAcceptId)return;
     let interim='';
     // Start at resultIndex: anything before it was already banked.
     for(let i=event.resultIndex;i<event.results.length;i++){
@@ -1509,7 +1517,7 @@ function launchRecognition(){
   };
 
   rec.onend=()=>{
-    if(dictationRecognition!==rec)return;    // superseded by a newer session
+    if(rec._id!==dictationAcceptId)return;   // superseded by a newer session
     if(dictationState!=='recording')return;  // paused or stopped deliberately
     dictationRestartTimer=setTimeout(()=>{
       if(dictationState==='recording')launchRecognition();
@@ -1542,18 +1550,27 @@ function resumeDictation(){
 
 function stopDictation(){
   const fieldId=dictationActiveField,btnId=dictationActiveBtn;
-  dictationState='idle';
+  const rec=dictationRecognition;
+  dictationState='idle';           // set first: onend must not relaunch
   clearTimeout(dictationRestartTimer);
-  if(dictationRecognition){
-    const r=dictationRecognition;
-    dictationRecognition=null;     // cleared first so onend won't relaunch
-    try{r.stop();}catch(e){}
-  }
+  dictationRecognition=null;
   dictationActiveField=null;
   dictationActiveBtn=null;
-  dictationCommitted='';
   setDictationUI(btnId,'idle');
-  if(fieldId){const f=document.getElementById(fieldId);if(f)f.value=f.value.trim();}
+  // dictationCommitted is deliberately NOT cleared here. Calling stop() makes
+  // the browser deliver one final result a moment later, and that handler
+  // rewrites the field from dictationCommitted — emptying it first wipes the
+  // whole transcript and leaves only the last few words. It is recomputed from
+  // the field whenever a sitting starts or resumes, so it never goes stale.
+  if(rec){try{rec.stop();}catch(e){}}
+  if(fieldId){
+    const tidyId=dictationAcceptId;
+    setTimeout(()=>{
+      if(dictationAcceptId!==tidyId)return;   // a new sitting already began
+      const f=document.getElementById(fieldId);
+      if(f)f.value=f.value.replace(/\s+$/,'');
+    },600);
+  }
 }
 
 // Hide/disable mic buttons up front if the browser truly doesn't support dictation
